@@ -2,9 +2,12 @@ node_modules/
 .next/
 out/
 *.tsbuildinfo
-.env*
 playwright-report/
 test-results/
+
+# Segredos: apenas .env.example é versionado
+.env*
+!.env.example
 
 # Prepared Git export (contains a separate checkout)
 /exports/
@@ -17,3 +20,20 @@ test-results/
 
 # Dumps locais do PostgreSQL
 *.dump
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
