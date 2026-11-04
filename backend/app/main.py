@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from app.api.routes import whatsapp
 from app.core.config import Settings, get_settings
 from app.services.whatsapp.container import WhatsAppModule, build_whatsapp_module
+from app.services.whatsapp.observability import configure_logging
 
 
 def create_app(
@@ -23,6 +24,7 @@ def create_app(
     whatsapp_module: WhatsAppModule | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
+    configure_logging()
     whatsapp_module = whatsapp_module or build_whatsapp_module(settings)
 
     @asynccontextmanager
