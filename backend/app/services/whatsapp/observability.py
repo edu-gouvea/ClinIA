@@ -11,6 +11,19 @@ from typing import Any
 logger = logging.getLogger("clinia.whatsapp")
 
 
+def configure_logging(level: int = logging.INFO) -> None:
+    """Garante saída dos eventos da integração mesmo sem configuração global de logging.
+
+    Idempotente. Quando a frente de Backend definir o logging da aplicação,
+    esta função pode ser removida de ``create_app``.
+    """
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+        logger.addHandler(handler)
+    logger.setLevel(level)
+
+
 def mask_phone(phone: str | None) -> str | None:
     """``5583999991234`` → ``5583*****1234``. Números curtos são totalmente mascarados."""
     if phone is None:
