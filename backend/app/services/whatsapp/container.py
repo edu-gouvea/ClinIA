@@ -16,6 +16,7 @@ from app.schemas.channel import Channel, InboundHandler
 from app.services.whatsapp.cloud_gateway import WhatsAppCloudGateway
 from app.services.whatsapp.dispatcher import InboundDispatcher
 from app.services.whatsapp.registry import GatewayRegistry
+from app.services.whatsapp.simulator_gateway import SimulatorGateway
 from app.services.whatsapp.store import ChannelMessageStore, InMemoryChannelMessageStore
 from app.services.whatsapp.stubs import EchoInboundHandler
 
@@ -29,6 +30,7 @@ class WhatsAppModule:
     registry: GatewayRegistry
     dispatcher: InboundDispatcher
     cloud_gateway: WhatsAppCloudGateway | None = None
+    simulator: SimulatorGateway | None = None
     _owned_http_client: httpx.AsyncClient | None = None
 
     async def aclose(self) -> None:
@@ -60,6 +62,11 @@ def build_whatsapp_module(
         )
         registry.register(Channel.WHATSAPP, cloud_gateway)
 
+    simulator = None
+    if settings.simulator_active:
+        simulator = SimulatorGateway()
+        registry.register(Channel.SIMULATOR, simulator)
+
     handler = (handler_factory or EchoInboundHandler)(registry)
     return WhatsAppModule(
         settings=settings,
@@ -67,5 +74,6 @@ def build_whatsapp_module(
         registry=registry,
         dispatcher=InboundDispatcher(handler, store),
         cloud_gateway=cloud_gateway,
+        simulator=simulator,
         _owned_http_client=owned_client,
     )
