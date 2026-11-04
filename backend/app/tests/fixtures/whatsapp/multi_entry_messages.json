@@ -1,0 +1,39 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "200000000000001",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp", "metadata": {"display_phone_number": "15550001111", "phone_number_id": "100000000000001"},
+            "contacts": [
+              {"profile": {"name": "Maria Teste"}, "wa_id": "558399990001"},
+              {"profile": {"name": "João Teste"}, "wa_id": "5583999990002"}
+            ],
+            "messages": [
+              {"from": "558399990001", "id": "wamid.MULTI0001", "timestamp": "1762250700", "type": "text", "text": {"body": "Qual o horário de funcionamento?"}},
+              {"from": "5583999990002", "id": "wamid.MULTI0002", "timestamp": "1762250701", "type": "location", "location": {"latitude": -7.1195, "longitude": -34.845}}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "200000000000002",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp", "metadata": {"display_phone_number": "15550001111", "phone_number_id": "100000000000001"},
+            "contacts": [{"profile": {"name": "Ana Teste"}, "wa_id": "5583999990003"}],
+            "messages": [
+              {"from": "5583999990003", "id": "wamid.MULTI0003", "timestamp": "1762250702", "type": "text", "text": {"body": "Quero cancelar minha consulta"}}
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
