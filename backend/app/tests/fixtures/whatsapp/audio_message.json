@@ -1,0 +1,26 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "200000000000001",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp", "metadata": {"display_phone_number": "15550001111", "phone_number_id": "100000000000001"},
+            "contacts": [{"profile": {"name": "Maria Teste"}, "wa_id": "558399990001"}],
+            "messages": [
+              {
+                "from": "558399990001",
+                "id": "wamid.AUDIO0001",
+                "timestamp": "1762250520",
+                "type": "audio",
+                "audio": {"mime_type": "audio/ogg; codecs=opus", "sha256": "ZmFrZQ==", "id": "900000000000002", "voice": true}
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
