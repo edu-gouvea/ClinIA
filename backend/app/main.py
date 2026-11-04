@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import whatsapp
+from app.api.routes import simulator, whatsapp
 from app.core.config import Settings, get_settings
 from app.services.whatsapp.container import WhatsAppModule, build_whatsapp_module
 from app.services.whatsapp.observability import configure_logging
@@ -41,4 +41,6 @@ def create_app(
         return {"status": "ok"}
 
     app.include_router(whatsapp.router)
+    if settings.simulator_active:
+        app.include_router(simulator.router)
     return app
