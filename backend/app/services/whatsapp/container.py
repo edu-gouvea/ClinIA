@@ -1,8 +1,12 @@
 """Montagem do módulo WhatsApp a partir das configurações.
 
-Quando o ``ConversationService`` existir, basta passar ``handler_factory``::
+Quando as outras frentes existirem, basta trocar os stubs::
 
-    build_whatsapp_module(settings, handler_factory=lambda registry: ConversationService(...))
+    build_whatsapp_module(
+        settings,
+        handler_factory=lambda registry: ConversationService(..., registry=registry),
+        conversation_lookup=SqlConversationLookup(...),
+    )
 """
 
 from collections.abc import Callable
@@ -15,10 +19,11 @@ from app.core.config import Settings, WhatsAppMode
 from app.schemas.channel import Channel, InboundHandler
 from app.services.whatsapp.cloud_gateway import WhatsAppCloudGateway
 from app.services.whatsapp.dispatcher import InboundDispatcher
+from app.services.whatsapp.outbound import ConversationLookup, PatientMessenger
 from app.services.whatsapp.registry import GatewayRegistry
 from app.services.whatsapp.simulator_gateway import SimulatorGateway
 from app.services.whatsapp.store import ChannelMessageStore, InMemoryChannelMessageStore
-from app.services.whatsapp.stubs import EchoInboundHandler
+from app.services.whatsapp.stubs import EchoInboundHandler, InMemoryConversationDirectory
 
 HandlerFactory = Callable[[GatewayRegistry], InboundHandler]
 
@@ -29,6 +34,7 @@ class WhatsAppModule:
     store: ChannelMessageStore
     registry: GatewayRegistry
     dispatcher: InboundDispatcher
+    messenger: PatientMessenger
     cloud_gateway: WhatsAppCloudGateway | None = None
     simulator: SimulatorGateway | None = None
     _owned_http_client: httpx.AsyncClient | None = None
@@ -42,6 +48,7 @@ def build_whatsapp_module(
     settings: Settings,
     *,
     handler_factory: HandlerFactory | None = None,
+    conversation_lookup: ConversationLookup | None = None,
     store: ChannelMessageStore | None = None,
     http_client: httpx.AsyncClient | None = None,
     cloud_gateway_options: dict[str, Any] | None = None,
@@ -67,12 +74,19 @@ def build_whatsapp_module(
         simulator = SimulatorGateway()
         registry.register(Channel.SIMULATOR, simulator)
 
-    handler = (handler_factory or EchoInboundHandler)(registry)
+    # Stubs enquanto ConversationService e Conversation não existem
+    directory = InMemoryConversationDirectory()
+    if handler_factory is None:
+        handler = EchoInboundHandler(registry, directory)
+    else:
+        handler = handler_factory(registry)
+
     return WhatsAppModule(
         settings=settings,
         store=store,
         registry=registry,
         dispatcher=InboundDispatcher(handler, store),
+        messenger=PatientMessenger(conversation_lookup or directory, registry),
         cloud_gateway=cloud_gateway,
         simulator=simulator,
         _owned_http_client=owned_client,
