@@ -1,0 +1,49 @@
+.team-page { gap: var(--space-4); }
+.team-list > .page-heading { margin: 0; align-items: center; }
+.team-list > .page-heading h1 { font-size: 24px; }
+.team-list > .toolbar { padding: 0; border: 0; background: none; }
+.team-roster { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.team-filters,.team-list-controls,.team-view-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.team-filters .search-input { flex: 1; }
+.team-filters > select { max-width: 260px; }
+.team-list-controls { justify-content: space-between; }
+.team-list-controls > p { color: var(--muted); font-size: var(--text-xs); }
+.team-view-controls select { font-size: var(--text-sm); max-width: 160px; }
+.team-roster-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--space-3); }
+.team-roster-grid .team-person-card { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.team-person-heading { display: grid; grid-template-columns: auto minmax(0,1fr); gap: var(--space-2); align-items: start; }
+.team-person-heading h2 { font-size: var(--text-md); line-height: var(--leading-normal); overflow-wrap: anywhere; }
+.team-person-heading > .badge { grid-column: 2; justify-self: start; }
+.team-specialties,.team-weekly { font-size: var(--text-xs); color: var(--muted); overflow-wrap: anywhere; }
+.team-person-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border); margin-top: auto; }
+.team-person-metrics dt { font-size: var(--text-xs); color: var(--muted); }
+.team-person-metrics dd { font-size: 18px; font-weight: var(--weight-semibold); margin: var(--space-1) 0 0; font-variant-numeric: tabular-nums; }
+.team-occupancy { display: inline-flex; flex-direction: column; gap: var(--space-1); min-width: 55px; }
+.team-occupancy strong { font-size: inherit; font-weight: inherit; }
+.team-occupancy > span { width: 55px; height: 3px; background: var(--surface-muted); border-radius: var(--radius-pill); overflow: hidden; }
+.team-occupancy i { display: block; height: 100%; background: var(--green); }
+.team-person-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border); font-size: var(--text-xs); }
+.team-review { color: var(--warning-ink); font-size: var(--text-xs); }
+.team-roster-table { overflow-x: auto; min-width: 0; }
+.team-roster-table table { min-width: 930px; }
+.team-roster-table th[scope=row] { min-width: 220px; max-width: 320px; white-space: normal; font-weight: var(--weight-medium); }
+.team-roster-table th[scope=row] small { display: block; font-size: var(--text-xs); margin-top: var(--space-1); color: var(--muted); }
+.team-roster-table th[scope=row] .text-link { overflow-wrap: anywhere; }
+.team-roster-table th button { display: inline-flex; align-items: center; gap: var(--space-1); font: inherit; color: inherit; background: none; border: 0; padding: var(--space-1) 0; }
+.team-roster-table th[aria-sort=ascending] button,.team-roster-table th[aria-sort=descending] button { color: var(--green-ink); }
+.team-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); align-items: center; color: var(--muted); font-size: var(--text-xs); }
+.team-pagination > div { display: flex; gap: var(--space-2); align-items: center; }
+.team-list .person-card { padding: var(--space-3); }
+.team-list .person-card h2 { font-size: var(--text-md); overflow-wrap: anywhere; }
+.team-list .person-card > .text-link { margin-top: var(--space-3); padding-top: var(--space-2); }
+.team-list .person-card .mini-stat-grid { margin: var(--space-3) 0; }
+@media (max-width: 1100px) { .team-roster-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 600px) {
+  .team-list > .page-heading { align-items: flex-start; }
+  .team-roster-grid { grid-template-columns: minmax(0,1fr); }
+  .team-filters > select,.team-filters > div { width: 100%; max-width: none; }
+  .team-list-controls,.team-view-controls { align-items: stretch; }
+  .team-view-controls { width: 100%; }
+  .team-view-controls .segmented { margin-left: auto; }
+  .team-pagination { align-items: flex-start; }
+}

@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.env*
+playwright-report/
+test-results/
+
+# Prepared Git export (contains a separate checkout)
+/exports/
+
+.aws/
+
+.codex/
+
+.agents/

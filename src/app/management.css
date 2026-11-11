@@ -1,0 +1,54 @@
+.management-overview { gap: var(--space-4); }
+.management-overview > .page-heading { margin: 0; align-items: center; }
+.management-overview > .page-heading h1 { font-size: 24px; }
+.management-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; }
+.management-toolbar > .field { flex: 1; min-width: 180px; max-width: 320px; }
+.management-toolbar > .field:first-child { flex: 0 1 180px; }
+.management-period { display: flex; align-items: center; gap: var(--space-2); }
+.management-period select { flex: 1; min-width: 0; }
+.management-period-caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); font-size: var(--text-xs); color: var(--muted); }
+.management-period-caption strong { font-weight: var(--weight-medium); color: var(--ink); }
+.management-overview .metric-card { padding: var(--space-3) var(--space-4); background: var(--surface); }
+.management-overview .metric-label { color: var(--muted); }
+.management-overview .metric-value { font-size: 28px; margin-top: var(--space-1); font-weight: var(--weight-semibold); }
+.management-overview .metric-value.no-data { font-size: 22px; min-height: 35px; }
+.management-baseline { margin: var(--space-2) 0 var(--space-1); color: var(--muted); font-size: var(--text-xs); }
+.management-change { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--muted); }
+.management-overview .metric-card > .management-change { display: flex; }
+.management-change[data-tone=positive] { color: var(--green-ink); }
+.management-change[data-tone=negative] { color: var(--danger-ink); }
+.management-analysis-grid { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(340px,1fr); gap: var(--space-4); align-items: start; }
+.management-overview .card { padding: var(--space-4); }
+.management-overview .card-header { gap: var(--space-3); margin-bottom: var(--space-3); }
+.management-overview .card-header h2 { font-size: var(--text-md); }
+.management-overview .card-header .text-link { font-size: var(--text-xs); flex: none; }
+.management-trend .trend-chart { min-height: 0; overflow-x: auto; }
+.management-trend .trend-chart svg { min-width: 660px; max-height: none; }
+.management-trend .chart-legend { gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-2); }
+.management-overview .table-wrap { min-width: 0; overflow-x: auto; }
+.management-overview .data-table th { font-weight: var(--weight-medium); }
+.management-overview .data-table th[scope=row] { text-align: left; color: var(--ink); white-space: normal; }
+.management-overview .data-table tfoot { border-top: 1px solid var(--border); background: var(--surface-subtle); }
+.management-overview .data-table tfoot td,.management-overview .data-table tfoot th { font-weight: var(--weight-semibold); }
+.management-note { font-size: var(--text-xs); color: var(--muted); line-height: var(--leading-normal); margin: var(--space-2) 0; }
+.management-professionals .data-table { min-width: 1050px; }
+.management-professionals .data-table th:first-child { min-width: 210px; max-width: 300px; }
+.management-professionals .data-table th[scope=row] small { display: block; font-size: var(--text-xs); color: var(--muted); margin-top: var(--space-1); overflow-wrap: anywhere; }
+.management-sort { display: inline-flex; align-items: center; gap: var(--space-1); border: 0; background: none; padding: var(--space-1) 0; color: inherit; font-size: inherit; font-weight: inherit; }
+.management-sort:hover { color: var(--green-ink); }
+.management-sort svg { flex: none; }
+.management-person { display: flex; align-items: center; gap: var(--space-1); color: var(--green-ink); overflow-wrap: anywhere; }
+.management-person svg { flex: none; }
+.management-occupancy { display: inline-flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); min-width: 60px; }
+.management-meter { display: block; width: 60px; height: 3px; border-radius: var(--radius-pill); background: var(--surface-muted); overflow: hidden; }
+.management-meter i { display: block; height: 100%; background: var(--green); }
+.management-empty { text-align: center; color: var(--muted); padding: var(--space-6)!important; }
+@media (max-width: 1100px) { .management-analysis-grid { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 600px) {
+  .management-overview > .page-heading { align-items: flex-start; }
+  .management-overview > .page-heading h1 { font-size: 22px; }
+  .management-toolbar > .field,.management-toolbar > .field:first-child { min-width: 0; flex: 1 1 100%; max-width: none; }
+  .management-overview .metric-card { padding: var(--space-3); }
+  .management-overview .metric-value { font-size: 26px; }
+  .management-outcomes .data-table { min-width: 350px; }
+}
