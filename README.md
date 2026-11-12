@@ -118,3 +118,7 @@ A matriz de responsividade, acessibilidade e os limites da validação estão em
 Versões fixadas em `package.json` e `package-lock.json`: Next.js **16.4.6**, React **19.3.1**, TypeScript **5.9.3**, Tailwind **4.3.5** e Lucide **0.468.0**. Playwright **1.65.0** é usado apenas nos testes.
 
 Persistência, identidade administrativa, mensagens de WhatsApp e IA operam como **demonstração local**. Não há login real, integração com WhatsApp, envio externo, LLM, sincronização entre dispositivos ou backend. O assistente consulta e sugere; ele não executa alterações. A demonstração é destinada a uma aba ativa por vez; concorrência entre sessões dependerá da integração futura. As anotações de consulta são locais e fictícias. Prontuário completo, gestão financeira e autorização por médico dependem de integração futura. Nenhum dado real de paciente foi utilizado.
+
+## Banco PostgreSQL — proposta do integrante 5
+
+Estrutura, dados fictícios, testes de integridade/concorrência e instruções locais em [database/README.md](database/README.md). A aplicação continua usando a demonstração local; a conexão à API depende da integração com o backend.
