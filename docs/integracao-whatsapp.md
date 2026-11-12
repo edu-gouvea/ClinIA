@@ -257,9 +257,15 @@ Quando o modelo `Message` for criado, ele precisa destes campos de integração:
 | `external_id` | string, **único por (`channel`, `external_id`)** | base da idempotência (wamid) |
 | `delivery_status` | enum `pending \| sent \| delivered \| read \| failed`, nulo para entrada | só para saída |
 
-Telefones: guardar o `wa_id` **exatamente como a Meta envia** e usá-lo em `Patient.find_by_phone`.
-Não normalizar o número: no Brasil o `wa_id` pode vir sem o nono dígito, e ao "corrigir" o formato perdemos a
-correspondência com o mesmo paciente.
+Telefones: guardar o `wa_id` **exatamente como a Meta envia** para responder ao paciente.
+Não "corrigir" esse valor: no Brasil o `wa_id` pode vir sem o nono dígito, e a Meta só entrega para o formato
+que ela mesma enviou.
+
+> **Atualização (2026-11-12):** o `database/schema.sql` e o frontend guardam o telefone do paciente no formato
+> local (DDD + número, 10 ou 11 dígitos, ex.: `81999990001`), e um mesmo telefone pode pertencer a vários
+> pacientes. Portanto a busca do paciente não pode comparar o `wa_id` diretamente: ela precisa gerar candidatos
+> (sem o `55`, com e sem o nono dígito) e tratar mais de um resultado. Ver lacunas em
+> [`contexto-whatsapp.md`](contexto-whatsapp.md), seção 1.
 
 Hoje o módulo usa `ChannelMessageStore` (interface) com uma implementação em memória. Quando `Message`
 existir, uma implementação SQL substitui a de memória, sem mudar o restante do módulo.

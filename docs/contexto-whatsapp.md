@@ -8,19 +8,30 @@
 
 ---
 
-## 1. Estado atual (atualizado em 2026-11-04)
+## 1. Estado atual (atualizado em 2026-11-12)
 
 **O repositório estava vazio** (só README e LICENSE) quando a frente começou. Nenhuma outra frente tinha
 código. Por isso o módulo foi feito para funcionar sozinho, com stubs e estado em memória atrás de interfaces.
 
+Depois disso, as outras frentes passaram a integrar direto na `main` (sem `develop`):
+
+- **Frontend** (Next.js na raiz do repositório, `src/`): demonstração navegável com dados em localStorage,
+  sem chamadas a API. Commit `d530b1b`.
+- **Banco** (`database/schema.sql`, `docs/banco/`): baseline PostgreSQL 16 com RLS por clínica, testes e CI.
+  PR #1, merge `cce41e0`.
+
+Por isso a `feature/whatsapp` foi **rebaseada sobre a `main`** e o PR vai para a `main` (seção 9). A `develop`
+local ficou obsoleta. O único conflito foi no `.gitignore` (união das duas versões, mantendo `!.env.example`,
+porque a `main` ignora `.env*`). Os 89 testes continuam passando.
+
 | Branch | Conteúdo | Situação |
 |---|---|---|
-| `main` | Commit inicial | intocada |
-| `develop` | Esqueleto mínimo do backend (`884362e`) | **só local**, ainda não enviada ao GitHub |
-| `feature/whatsapp` | Módulo completo, 5 commits, um por fase | **só local**; PR para `develop` ainda não aberto |
+| `main` | Commit inicial + frontend + banco | no GitHub |
+| `feature/whatsapp` | Esqueleto do backend + módulo completo, sobre a `main` | **só local**; PR para `main` ainda não aberto |
 
 Commits da `feature/whatsapp` (em ordem):
 
+0. `chore(backend): esqueleto mínimo do backend FastAPI`
 1. `feat(whatsapp): configuração, contratos do canal e validação de assinatura` — Fase 1
 2. `feat(whatsapp): webhook da Cloud API com idempotência e processamento em segundo plano` — Fase 2
 3. `feat(whatsapp): envio pela Cloud API com retry, divisão de texto e janela de 24h` — Fase 3
@@ -31,8 +42,21 @@ Commits da `feature/whatsapp` (em ordem):
 **Testes:** 89 passando, sem internet (`cd backend && pytest`). Ambiente usado: Python 3.13, FastAPI 0.162,
 Pydantic 2.14, httpx 0.28.
 
-**Ainda não existe** (outras frentes): `models/`, `core/database.py`, `core/security.py`, SQLAlchemy/Alembic,
-PostgreSQL, Docker, `services/conversations|appointments|ai`, frontend.
+**Ainda não existe** (outras frentes): `models/`, `core/database.py`, `core/security.py`, SQLAlchemy/Alembic
+(o `schema.sql` ainda precisa virar baseline Alembic), Docker do backend, `services/conversations|appointments|ai`,
+integração do frontend com a API.
+
+### Lacunas entre o módulo e o `database/schema.sql` (revisão de 2026-11-12)
+
+| Lacuna no banco | Impacto no WhatsApp | Encaminhamento |
+|---|---|---|
+| `messages.delivery` aceita só `pendente/enviada/falha` | `delivered` e `read` da Meta se perdem | Pedir `message_deliveries` (abaixo) ou ampliar o CHECK |
+| Uma linha de `messages` tem um único `external_id` | Texto longo dividido gera N wamids | Pedir `message_deliveries(message_id, external_id, status, at)` |
+| Sem `channel` e sem timestamp da Meta | Janela de 24h (D7) cairia em `created_at` | Pedir coluna `external_at` (ou usar `created_at` e registrar a limitação) |
+| RLS também em `clinics` | O webhook chega sem sessão e não consegue descobrir a clínica pelo `phone_number_id` | Pedir tabela de roteamento canal → clínica, ou função `SECURITY DEFINER` |
+| `body NOT NULL`, não vazio | Imagem/áudio recebidos não têm texto | Texto substituto (ex.: `[imagem recebida]`) |
+| Telefone compartilhado entre pacientes; telefones locais com 10–11 dígitos (seed `81999990001`) | `wa_id` vem com `55` e às vezes sem o nono dígito; um número pode corresponder a vários pacientes | Função de candidatos de telefone nesta frente + regra de desambiguação com Conversas |
+| `idempotency_key` obrigatório e único por clínica | Encaixa na idempotência atual | Convenção: `whatsapp:in:<wamid>` e `whatsapp:out:<uuid>` gerado antes do envio (outbox) |
 
 ---
 
@@ -86,7 +110,7 @@ FastAPI, SQLAlchemy/Alembic, PostgreSQL, Docker, Pytest).
 
 | # | Decisão | Motivo |
 |---|---|---|
-| D1 | Criar `develop` com um esqueleto mínimo e ramificar `feature/whatsapp` dela | O repositório estava vazio. Assim o PR do WhatsApp mostra só código da frente, e as outras frentes partem da mesma base. |
+| D1 | Criar `develop` com um esqueleto mínimo e ramificar `feature/whatsapp` dela. **Revisto em 2026-11-12:** a equipe integra direto na `main`, então a branch foi rebaseada sobre a `main` e o PR vai para lá. | O repositório estava vazio. Assim o PR do WhatsApp mostra só código da frente, e as outras frentes partem da mesma base. |
 | D2 | `create_app()` como fábrica (`uvicorn app.main:create_app --factory`) | Configuração não é lida no import. Testes montam apps com configurações diferentes sem variáveis globais. |
 | D3 | Estado da integração atrás de `Protocol` (`ChannelMessageStore`, `ConversationLookup`) com implementação em memória | O modelo `Message`/`Conversation` não existe e `models/` é de outra frente. Trocar por SQL depois não mexe no restante do módulo. |
 | D4 | `verify_signature` em `services/whatsapp/signature.py`, não em `core/security.py` | `core/` é da frente de Backend. A assinatura da Meta só interessa a este módulo. |
@@ -151,10 +175,10 @@ dependência e do padrão Strategy (um gateway por canal) com Registry.
 
 | Frente | Pedido | Bloqueia |
 |---|---|---|
-| Backend/Arquitetura | Validar o esqueleto da `develop` (estrutura, `create_app --factory`, `api/deps.py`). Definir o logging global (aí `configure_logging` sai). | Merge da `develop` |
-| Banco/Testes | Modelo `Message` com `channel`, `direction`, `external_id` (`UNIQUE(channel, external_id)`), `delivery_status`. `Patient.find_by_phone` usando o `wa_id` sem normalizar. Tipo do id de `Conversation` (int ou UUID). | `SqlChannelMessageStore` e a migration dos campos de integração |
+| Backend/Arquitetura | Validar o esqueleto do backend (estrutura, `create_app --factory`, `api/deps.py`). Definir o logging global (aí `configure_logging` sai). Incorporar `database/schema.sql` como baseline Alembic. | `SqlChannelMessageStore` |
+| Banco/Testes | O `schema.sql` já existe (UUID, `messages.external_id` e `idempotency_key` únicos por clínica). Faltam: `message_deliveries` (N wamids e `delivered/read`), timestamp da Meta, roteamento canal → clínica fora da RLS. Ver lacunas na seção 1. | `SqlChannelMessageStore` e a migration dos campos de integração |
 | Conversas | `ConversationService` implementando `InboundHandler`, respondendo via `GatewayRegistry` e tratando `unsupported`. Implementar `ConversationLookup.get_contact`. Definir quem grava a `Message` de saída (sugestão: o `ConversationService`, usando `SendResult.external_ids`). | Troca do `EchoInboundHandler` |
-| Frontend | Tela estilo WhatsApp usando a API do simulador (polling com `after`). Botão de resposta do atendente chamando a rota que usa `send_to_patient`; tratar `reason == "window_closed"`. | Demonstração |
+| Frontend | Trocar o "Simular mensagem recebida" (hoje local, `conversation.receive`) por `POST /api/simulator/messages`, com polling via `after`. Botão de resposta do atendente chamando a rota que usa `send_to_patient`; tratar `reason == "window_closed"`. Combinar CORS ou rewrite do Next (porta 3000 → 8000). | Demonstração |
 | DevOps | Dockerfile/compose rodando `uvicorn app.main:create_app --factory`, com variáveis de ambiente injetadas (nunca `.env` na imagem). CI rodando `pytest`. Túnel HTTPS ou domínio para o webhook. | Implantação |
 
 ---
@@ -163,7 +187,7 @@ dependência e do padrão Strategy (um gateway por canal) com Registry.
 
 Em ordem sugerida. Cada item cita os arquivos afetados.
 
-1. **Publicar as branches** (`git push -u origin develop feature/whatsapp`) e abrir o PR `feature/whatsapp → develop` (descrição na seção 9).
+1. **Publicar a branch** (`git push -u origin feature/whatsapp`) e abrir o PR `feature/whatsapp → main` (descrição na seção 9).
 2. **Migration dos campos de integração** em `Message`. Avisar a equipe antes, como combinado. Criar o índice único `(channel, external_id)`.
 3. **`SqlChannelMessageStore`** em `services/whatsapp/store.py` (ou `repositories/`, combinar com a frente de Banco):
    - `claim_inbound` → `INSERT` respeitando o `UNIQUE`; conflito = duplicata (idempotência real, entre processos);
@@ -246,7 +270,7 @@ ignorado. Em `WHATSAPP_MODE=cloud`, a aplicação não inicia se faltar alguma c
 
 ---
 
-## 9. Rascunho da descrição do PR (`feature/whatsapp → develop`)
+## 9. Rascunho da descrição do PR (`feature/whatsapp → main`)
 
 ```markdown
 ## O que foi feito
@@ -269,9 +293,9 @@ Camada de canal do ClinIA (frente WhatsApp / Integrações):
 RF05, RF06, RF13/RF15, RF16, RNF01, RNF02, RNF07, RNF08 (rastreabilidade em docs/contexto-whatsapp.md §4)
 
 ## Depende de outras frentes
-- Banco: campos de integração em `Message` (+ migration) e `Patient.find_by_phone`
+- Banco: sobre o `database/schema.sql`, tabela `message_deliveries` (N wamids, `delivered/read`), timestamp da Meta e roteamento canal → clínica fora da RLS (detalhes em `docs/contexto-whatsapp.md` §1)
 - Conversas: `ConversationService` implementando `InboundHandler`; `ConversationLookup`
-- Frontend: tela do simulador e botão de resposta do atendente
+- Frontend: trocar o "Simular mensagem recebida" local pela API do simulador e ligar o botão de resposta do atendente
 - DevOps: Docker/CI e URL HTTPS para o webhook
 
 ## Limitações
