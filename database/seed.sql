@@ -1,0 +1,22 @@
+-- Somente ambiente de desenvolvimento. IDs estáveis; não reexecutar na mesma base.
+BEGIN;
+SET search_path TO clinia,public;
+SET LOCAL clinia.clinic_id = '00000000-0000-0000-0000-000000000001';
+INSERT INTO clinics(id,name,address,phone) VALUES ('00000000-0000-0000-0000-000000000001','Clínica Demonstração','Rua Exemplo, 100','81999990000');
+INSERT INTO users(id,clinic_id,name,email,role) VALUES ('00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','Admin Demonstração','admin@example.invalid','admin');
+INSERT INTO patients(id,clinic_id,name,phone,insurance) VALUES ('00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000001','Paciente Exemplo','81999990001','Particular'),('00000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000001','Paciente Dois','81999990001','Particular');
+INSERT INTO professionals(id,clinic_id,name) VALUES ('00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000001','Profissional Exemplo'),('00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000001','Profissional Dois');
+INSERT INTO specialties(id,clinic_id,name) VALUES ('00000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000001','Cardiologia');
+INSERT INTO professional_specialties VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000007'),('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000007');
+INSERT INTO insurances(clinic_id,name) VALUES ('00000000-0000-0000-0000-000000000001','Particular');
+INSERT INTO clinic_hours(clinic_id,weekday,starts_at,ends_at) SELECT '00000000-0000-0000-0000-000000000001',day,'08:00','18:00' FROM generate_series(1,5) day;
+INSERT INTO professional_availability(clinic_id,professional_id,weekday,starts_at,ends_at) SELECT '00000000-0000-0000-0000-000000000001',prof,day,'08:00','18:00' FROM (VALUES ('00000000-0000-0000-0000-000000000005'::uuid),('00000000-0000-0000-0000-000000000006'::uuid)) p(prof) CROSS JOIN generate_series(1,5) day;
+INSERT INTO calendar_entries(id,clinic_id,professional_id,patient_id,specialty_id,kind,starts_at,ends_at,status,created_by) VALUES ('00000000-0000-0000-0000-000000000008','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-000000000007','appointment','2030-11-04 09:00-03','2030-11-04 09:30-03','agendada','00000000-0000-0000-0000-000000000002');
+INSERT INTO calendar_entries(clinic_id,professional_id,kind,starts_at,ends_at,status,reason) VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000005','block','2030-11-04 12:00-03','2030-11-04 13:00-03','bloqueado','Intervalo');
+INSERT INTO conversations(id,clinic_id,patient_id,status) VALUES ('00000000-0000-0000-0000-000000000009','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003','aguardando');
+INSERT INTO conversation_sessions(id,clinic_id,conversation_id) VALUES ('00000000-0000-0000-0000-000000000010','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000009');
+INSERT INTO messages(clinic_id,session_id,author,body,delivery,idempotency_key) VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000010','paciente','Gostaria de marcar uma consulta.','enviada','seed-message-1');
+INSERT INTO human_handoffs(clinic_id,session_id,reason) VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000010','Solicitação do paciente');
+INSERT INTO knowledge_documents(clinic_id,title,content) VALUES ('00000000-0000-0000-0000-000000000001','Endereço','Rua Exemplo, 100. Atendimento administrativo.');
+INSERT INTO audit_events(clinic_id,actor_id,event_type,entity_type,entity_id) VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002','appointment.created','calendar_entries','00000000-0000-0000-0000-000000000008');
+COMMIT;

@@ -1,0 +1,19 @@
+name: clinia-database
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: clinia
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${CLINIA_DB_PASSWORD:?Defina CLINIA_DB_PASSWORD para desenvolvimento}
+    ports:
+      - "127.0.0.1:${CLINIA_DB_PORT:-5433}:5432"
+    volumes:
+      - clinia_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d clinia"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  clinia_data:
