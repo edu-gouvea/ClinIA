@@ -4,6 +4,7 @@ Sistema de atendimento para clínicas via WhatsApp com agente de IA. Equipe divi
 (backend/arquitetura, agente de IA, frontend/dashboard, banco/testes, DevOps, WhatsApp/integrações).
 
 ## Arquitetura (fixa, não alterar)
+- Frontend Next.js na raiz (`src/`, ver `AGENTS.md`); banco em `database/` (`schema.sql`, ver `docs/banco/`).
 - Monólito modular; sem microsserviços, filas externas ou Kubernetes.
 - Python + FastAPI + Pydantic; SQLAlchemy + Alembic; PostgreSQL; Docker; Pytest.
 - Código em `backend/app/` (`api/routes`, `core`, `models`, `schemas`, `services/<frente>`, `repositories`, `tests`).
@@ -14,7 +15,7 @@ Sistema de atendimento para clínicas via WhatsApp com agente de IA. Equipe divi
 - Servidor: `.venv/bin/uvicorn app.main:create_app --factory --reload`
 
 ## Branches
-- `main` → `develop` (esqueleto do backend) → `feature/<frente>`. PRs vão para `develop`.
+- `main` → `feature/<frente>`. PRs vão para `main` (a equipe não usa `develop`).
 - Commits em Conventional Commits, com escopo da frente: `feat(whatsapp): ...`.
 
 ## Frente WhatsApp / Integrações
