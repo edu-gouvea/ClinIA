@@ -16,7 +16,9 @@ export function parseTimeInput(text: string): string | null {
   return `${parts[1].padStart(2, '0')}:${parts[2]}`;
 }
 const readableDate = (iso: string) => /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split('-').reverse().join('/') : iso;
-type Props = { value: string; onChange: (value: string) => void; label: string; required?: boolean; min?: string; disabled?: boolean; className?: string };
+/** `externalError`/`externalErrorId`: a rule error shown by the host (e.g. "outside availability"),
+ * announced through `aria-invalid` and `aria-describedby` like the format errors. */
+type Props = { value: string; onChange: (value: string) => void; label: string; required?: boolean; min?: string; disabled?: boolean; className?: string; externalError?: string; externalErrorId?: string };
 
 function temporalIssue(kind: 'date' | 'time', text: string, required: boolean, min?: string) {
   if (!text.trim()) return required ? 'Preencha este campo.' : '';
@@ -27,7 +29,7 @@ function temporalIssue(kind: 'date' | 'time', text: string, required: boolean, m
 
 /** Keep a text draft while typing. Commit on blur/Enter, not each numeric segment,
  * so URL updates and controlled state never reset an unfinished date or hour. */
-function TemporalInput({ value, onChange, label, required = false, min, disabled, className = '', kind }: Props & { kind: 'date' | 'time' }) {
+function TemporalInput({ value, onChange, label, required = false, min, disabled, className = '', kind, externalError, externalErrorId }: Props & { kind: 'date' | 'time' }) {
   const display = kind === 'date' ? readableDate : (v: string) => v;
   const [lastValue, setLastValue] = useState(value);
   const [draft, setDraft] = useState(display(value));
@@ -53,7 +55,7 @@ function TemporalInput({ value, onChange, label, required = false, min, disabled
   return <span className={`temporal-field ${className}`}>
     <span className="temporal-control">
       <input ref={field} type="text" inputMode="numeric" autoComplete="off" aria-label={label} placeholder={kind === 'date' ? 'DD/MM/AAAA' : 'HH:MM'} maxLength={kind === 'date' ? 10 : 5} required={required} disabled={disabled} value={draft}
-        aria-invalid={showError || undefined} aria-describedby={showError ? errorId : undefined}
+        aria-invalid={showError || !!externalError || undefined} aria-describedby={showError ? errorId : externalError ? externalErrorId : undefined}
         onChange={event => { setDraft(event.target.value); setShowError(false); event.target.setCustomValidity(issue(event.target.value)); }}
         onBlur={commit} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); } }} />
       {kind === 'date' ? <><button type="button" className="temporal-picker-button" disabled={disabled} aria-label={`Selecionar ${label.toLowerCase()} no calendário`} onClick={() => { try { picker.current?.showPicker(); } catch { field.current?.focus(); } }}><CalendarDays size={16} /></button><input ref={picker} className="temporal-native-picker" tabIndex={-1} aria-hidden="true" type="date" min={min} value={value} disabled={disabled} onChange={event => { const next = event.target.value; if (!next) return; setDraft(display(next)); field.current?.setCustomValidity(''); setShowError(false); onChange(next); }} /></> : <Clock3 className="temporal-clock" size={16} aria-hidden="true" />}

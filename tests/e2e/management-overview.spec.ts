@@ -19,34 +19,41 @@ test('análise compara períodos, ordena indicadores e preserva filtros nos link
   const table = page.getByRole('region', { name: 'Tabela de atividade por profissional' });
   const completed = table.getByRole('columnheader').filter({ has: page.getByRole('button', { name: 'Ordenar por Realizadas', exact: true }) });
   await expect(completed).toHaveAttribute('aria-sort', 'descending');
-  const values = await table.locator('tbody tr').evaluateAll(rows => rows.map(row => Number(row.querySelectorAll('td')[1].textContent)));
+  // The name is now the row header (th) and the Realizadas cell also carries its delta line.
+  const values = await table.locator('tbody tr').evaluateAll(rows => rows.map(row => Number(row.querySelector('td .cell-strong')!.textContent)));
   expect(values).toEqual([...values].sort((a, b) => b - a));
   await table.getByRole('button', { name: 'Ordenar por Realizadas', exact: true }).click();
   await expect(completed).toHaveAttribute('aria-sort', 'ascending');
-  await page.getByLabel('Período dos indicadores').selectOption('30');
+  // Period select → period menu; Profissional/Especialidade selects → filter chips.
+  await page.getByRole('button', { name: /^Período dos indicadores/ }).click();
+  await page.getByRole('menuitemradio', { name: 'Últimos 30 dias' }).click();
   await expect(page).toHaveURL(/period=30/);
-  await page.getByRole('combobox', { name: 'Profissional', exact: true }).selectOption('pro-clara');
+  await page.getByRole('button', { name: 'Filtrar por profissional', exact: true }).click();
+  await page.getByRole('option', { name: /Dra\. Clara Mendes/ }).click();
   await expect(page).toHaveURL(/professional=pro-clara/);
-  await page.getByRole('combobox', { name: 'Especialidade', exact: true }).selectOption('Cardiologia');
+  await page.getByRole('button', { name: 'Filtrar por especialidade', exact: true }).click();
+  await page.getByRole('option', { name: 'Cardiologia', exact: true }).click();
   await expect(page).toHaveURL(/specialty=Cardiologia/);
   await expect(table.locator('tbody tr')).toHaveCount(1);
   const expected = getMetrics(seed, getPeriod(seed.referenceDate, 30), 'pro-clara', 'Cardiologia');
   await expect(page.locator('.metric-card').filter({ hasText: 'Consultas realizadas' }).locator('.metric-value')).toHaveText(String(expected.completed));
   await expect(completed).toHaveAttribute('aria-sort', 'ascending');
-  const planned = table.locator('tbody tr td').first().getByRole('link');
-  const href = new URL((await planned.getAttribute('href'))!, 'http://localhost');
+  // Per-cell Agenda links left the table (one destination per row); the KPI links keep
+  // the recorte (professional, specialty, period) in the Agenda URL.
+  const kpiLink = page.locator('.metric-card').filter({ hasText: 'Consultas realizadas' });
+  const href = new URL((await kpiLink.getAttribute('href'))!, 'http://localhost');
   expect(href.searchParams.get('professional')).toBe('pro-clara');
   expect(href.searchParams.get('specialty')).toBe('Cardiologia');
   expect(href.searchParams.get('from')).toBe(getPeriod(seed.referenceDate, 30).start);
-  expect(href.searchParams.get('status')).toBe('previstas');
-  await table.getByRole('link', { name: /Clara Mendes/ }).click();
-  await expect(page).toHaveURL(/gestao\/equipe\?id=pro-clara/);
+  expect(href.searchParams.get('status')).toBe('realizada');
+  await table.getByRole('link', { name: 'Abrir Dra. Clara Mendes na Equipe', exact: true }).click();
+  await expect(page).toHaveURL(/gestao\/equipe\?id=pro-clara&days=30/);
   await page.goBack();
-  await expect(page.getByRole('combobox', { name: 'Especialidade', exact: true })).toHaveValue('Cardiologia');
+  await expect(page.getByRole('button', { name: 'Especialidade: Cardiologia', exact: true })).toBeVisible();
   await expect(table.getByRole('columnheader').filter({ hasText: 'Realizadas' })).toHaveAttribute('aria-sort', 'ascending');
   await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
   await expect(table.locator('tbody tr')).toHaveCount(seed.professionals.length);
-  await expect(page.getByLabel('Período dos indicadores')).toHaveValue('30');
+  await expect(page.getByRole('button', { name: 'Período dos indicadores: Últimos 30 dias', exact: true })).toBeVisible();
 });
 
 test('histórico, taxas sem base e recorte vazio continuam legíveis em telas menores e no tema noturno', async ({ page }) => {
@@ -66,18 +73,21 @@ test('histórico, taxas sem base e recorte vazio continuam legíveis em telas me
     await table.scrollIntoViewIfNeeded();
     await table.evaluate(element => { element.scrollLeft = element.scrollWidth; });
     expect(await table.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
-    await expect(table.getByRole('button', { name: 'Ordenar por Taxa de faltas', exact: true })).toBeInViewport();
+    // "Taxa de faltas" is no longer a column (the rate sits under Faltas): the last column is "Em aberto".
+    await expect(table.getByRole('button', { name: 'Ordenar por Em aberto', exact: true })).toBeInViewport();
   }
   await table.evaluate(element => { element.scrollLeft = 0; });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: 'docs/qa/gestao-analise-mobile.png', fullPage: true });
-  await page.getByRole('button', { name: 'Ativar modo noturno', exact: true }).click();
+  // The theme switch sits in the sidebar, which is a drawer below 768 px: widen first.
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Tema escuro', exact: true }).click();
   await page.screenshot({ path: 'docs/qa/gestao-analise-noturna.png', fullPage: true });
   await page.goto('/gestao/visao-gerencial?professional=missing&period=1');
-  await expect(page.getByText('Nenhum profissional neste recorte.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Nenhum profissional neste recorte' })).toBeVisible();
   await expect(page.locator('.metric-value').filter({ hasText: 'Sem dados' })).toHaveCount(2);
-  await expect(page.locator('.management-change svg')).toHaveCount(0);
+  // The shared KPI strip draws ▲/▼ as text, never icons.
+  await expect(page.locator('.metric-change svg')).toHaveCount(0);
 });
 
 test('controles de período preservados sem ícones; agendamento disponível apenas no Início', async ({ page }) => {
@@ -87,7 +97,7 @@ test('controles de período preservados sem ícones; agendamento disponível ape
   await expect(page.getByRole('button', { name: /Novo agendamento/ })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ver agenda', exact: true })).toBeVisible();
   await page.goto('/gestao/visao-gerencial');
-  await expect(page.locator('.management-period svg')).toHaveCount(0);
-  await expect(page.getByLabel('Período dos indicadores')).toBeVisible();
+  // The period select became a menu button (Calendar icon by design, decision of the redesign).
+  await expect(page.getByRole('button', { name: /^Período dos indicadores/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Novo agendamento/ })).toHaveCount(0);
 });

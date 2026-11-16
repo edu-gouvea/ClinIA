@@ -73,8 +73,9 @@ test('equipe extensa e nomes longos permanecem legíveis no celular, tablet e te
   await expect(page.locator('.team-person-card')).toHaveCount(12);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: 'docs/qa/equipe-mobile.png', fullPage: true });
-  await page.getByRole('button', { name: 'Ativar modo noturno', exact: true }).click();
+  // The theme switch sits in the sidebar, which is a drawer below 768 px: widen first.
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Tema escuro', exact: true }).click();
   await page.screenshot({ path: 'docs/qa/equipe-noturna.png', fullPage: true });
   await page.getByRole('button', { name: 'Atendentes', exact: true }).click();
   await expect(page.locator('.person-card')).toHaveCount(seed.users.length);

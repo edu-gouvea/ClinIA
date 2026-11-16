@@ -33,6 +33,10 @@
 .team-roster-table th[aria-sort=ascending] button,.team-roster-table th[aria-sort=descending] button { color: var(--green-ink); }
 .team-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); align-items: center; color: var(--muted); font-size: var(--text-xs); }
 .team-pagination > div { display: flex; gap: var(--space-2); align-items: center; }
+/* Footer of "Consultas correspondentes" (professional detail). */
+.team-appointments-footer { margin-top: var(--space-3); padding: 8px 12px; border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-sm) var(--radius-sm); background: var(--surface-subtle); color: var(--subtle); font-size: 12px; }
+.team-appointments-footer > div { flex-wrap: wrap; }
+.team-appointments-footer .btn { min-height: 28px; height: 28px; padding: 0 8px; font-size: 13px; }
 .team-list .person-card { padding: var(--space-3); }
 .team-list .person-card h2 { font-size: var(--text-md); overflow-wrap: anywhere; }
 .team-list .person-card > .text-link { margin-top: var(--space-3); padding-top: var(--space-2); }

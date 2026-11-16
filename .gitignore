@@ -17,3 +17,6 @@ test-results/
 
 # Dumps locais do PostgreSQL
 *.dump
+
+# Capturas geradas pelos testes E2E (regravadas a cada execução)
+/docs/qa/

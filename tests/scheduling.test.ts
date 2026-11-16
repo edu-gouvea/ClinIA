@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDemoState } from '../src/lib/demo-data';
 import { runCommand } from '../src/lib/services';
-import { agendaProfessionals, agendaView, calendarBounds, calendarColumns, canRecordOutcome, getBlockConflicts, layoutAppointments } from '../src/lib/scheduling';
+import { agendaProfessionals, agendaView, calendarBounds, calendarColumns, CALENDAR_AXIS_WIDTH, CALENDAR_CLOSED_COLUMN_WIDTH, CALENDAR_MIN_COLUMN_WIDTH, canRecordOutcome, getBlockConflicts, layoutAppointments } from '../src/lib/scheduling';
 import { parseDateInput, parseTimeInput } from '../src/components/date-time-fields';
 import { isDemoState } from '../src/lib/state-validation';
 import type { Appointment, AppointmentInput } from '../src/lib/types';
@@ -125,4 +125,33 @@ test('filtered calendar preserves inactive and reclassified professionals with h
   assert.ok(agendaProfessionals(state, appointments, '', 'Cardiologia').some(p => p.id === 'pro-clara'));
   assert.equal(agendaProfessionals(state, [], '', 'Cardiologia').some(p => p.id === 'pro-clara'), false);
   assert.equal(agendaProfessionals(state, [], 'pro-clara', '').length, 1);
+});
+
+test('column width: 200 px per professional and 167 px per day, times lanes, never by name length', () => {
+  const state = seed();
+  assert.deepEqual(CALENDAR_MIN_COLUMN_WIDTH, { professionals: 200, dates: 167 });
+  assert.equal(CALENDAR_AXIS_WIDTH, 64);
+  state.patients[0].name = 'Maria Eduarda de Albuquerque Cavalcanti Vasconcelos de Souza';
+  const short = [{ ...event('short', '09:00', 15), patientId: state.patients[0].id }];
+  const [day] = calendarColumns(state, ['2026-11-10'], short, [state.professionals[0]], true);
+  assert.equal(day.width, 200);
+  const week = calendarColumns(state, ['2026-11-10', '2026-11-11'], short, [state.professionals[0]], false);
+  assert.deepEqual(week.map(c => c.width), [167, 167]);
+  const lanes = calendarColumns(state, ['2026-11-10'], [...short, { ...event('b', '09:00', 30), patientId: 'patient-2' }, { ...event('c', '09:05', 30), patientId: 'patient-3' }], [state.professionals[0]], true);
+  assert.equal(lanes[0].width, 600);
+  // 1440 px viewport: 1120 px content area holds the axis plus 4 professionals or 5 weekdays.
+  assert.ok(CALENDAR_AXIS_WIDTH + 4 * CALENDAR_MIN_COLUMN_WIDTH.professionals <= 1118);
+  assert.ok(CALENDAR_AXIS_WIDTH + 5 * CALENDAR_MIN_COLUMN_WIDTH.dates <= 1118);
+  // A clinic closed on weekends keeps them as compact columns, and the week still fits.
+  assert.ok(CALENDAR_AXIS_WIDTH + 5 * CALENDAR_MIN_COLUMN_WIDTH.dates + 2 * CALENDAR_CLOSED_COLUMN_WIDTH <= 1118);
+});
+
+test('closed weekdays become compact columns unless they hold appointments', () => {
+  const state = seed(); state.clinic.hours = state.clinic.hours.filter(slot => slot.day >= 1 && slot.day <= 5);
+  const days = ['2026-11-13', '2026-11-14', '2026-11-15'];
+  const sunday = { ...event('sunday', '09:00', 30), date: '2026-11-15' };
+  const columns = calendarColumns(state, days, [sunday], [state.professionals[0]], false);
+  assert.deepEqual(columns.map(c => [c.closed, c.width]), [[false, 167], [true, CALENDAR_CLOSED_COLUMN_WIDTH], [false, 167]]);
+  assert.equal(CALENDAR_CLOSED_COLUMN_WIDTH, 96);
+  assert.ok(calendarColumns(state, ['2026-11-14'], [], state.professionals, true).every(c => !c.closed));
 });

@@ -1,6 +1,7 @@
 import type { AssistantEntry, DemoState, Period } from './types';
 import { addDays, dateTime, formatDate, formatPeriod, weekStart } from './date';
 import { getFreeSlots, getMetrics, getPeriod } from './metrics';
+import { conversationStatusLabels } from './status-presentation';
 
 export const assistantSuggestions = [
   'O que ficou pendente hoje?',
@@ -93,9 +94,8 @@ export function answerQuestion(state: DemoState, question: string, context: stri
     } else {
       const patient = state.patients.find(p => p.id === conversation.patientId);
       const messages = conversation.messages.filter(m => m.author !== 'evento' && m.delivery === 'enviada');
-      const labels = { ia: 'com a IA de atendimento', aguardando: 'aguardando atendente', humano: 'em atendimento humano', encerrada: 'encerrada' };
       entry.period = 'Histórico local desta conversa';
-      entry.answer = `Conversa com ${patient?.name}. Situação: ${labels[conversation.status]}. ${conversation.reason ? `Motivo do encaminhamento: ${conversation.reason}. ` : ''}${messages.length} mensagem(ns) enviada(s) no histórico.\nÚltima mensagem: “${messages.at(-1)?.text || 'Sem mensagens'}”\nEste resumo usa os registros e rótulos locais; não interpreta conteúdo clínico.`;
+      entry.answer = `Conversa com ${patient?.name}. Situação: ${conversationStatusLabels[conversation.status]}. ${conversation.reason ? `Motivo do encaminhamento: ${conversation.reason}. ` : ''}${messages.length} mensagem(ns) enviada(s) no histórico.\nÚltima mensagem: “${messages.at(-1)?.text || 'Sem mensagens'}”\nEste resumo usa os registros e rótulos locais; não interpreta conteúdo clínico.`;
       entry.links = [{ label: 'Ver paciente', href: `/gestao/pacientes?id=${conversation.patientId}&context=${conversation.id}` }, { label: 'Abrir conversa', href: `/conversas?id=${conversation.id}` }];
     }
   } else if (/cancel/.test(normalized)) {

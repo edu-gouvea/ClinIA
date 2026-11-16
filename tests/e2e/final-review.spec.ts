@@ -42,7 +42,10 @@ test('modal isola o fundo, mantém o ciclo de teclado e restaura foco e rolagem'
   expect(await page.locator('main').evaluate(element => !!element.closest('[inert]'))).toBeTruthy();
   expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
   await page.keyboard.press('Shift+Tab');
-  await expect(dialog.getByRole('button', { name: 'Criar agendamento', exact: true })).toBeFocused();
+  // The primary "Agendar consulta" stays disabled until a time is chosen, so the cycle
+  // wraps to the last enabled control of the footer.
+  await expect(dialog.getByRole('button', { name: 'Agendar consulta', exact: true })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: 'Cancelar', exact: true })).toBeFocused();
   await page.keyboard.press('Tab'); await expect(close).toBeFocused();
   await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
@@ -58,11 +61,12 @@ test('ação de assumir conversa fica inteira em tela estreita e baixa', async (
   const claim = page.getByRole('button', { name: 'Assumir conversa', exact: true });
   await expect(claim).toBeVisible();
   const action = (await claim.boundingBox())!;
-  const context = (await page.locator('.conversation-context').boundingBox())!;
-  expect(action.y + action.height).toBeLessThanOrEqual(context.y + context.height + 1);
+  // The claim action now sits in the composer area at the bottom of the conversation.
+  expect(action.y + action.height).toBeLessThanOrEqual(568);
+  expect(action.x + action.width).toBeLessThanOrEqual(320);
   await claim.click();
-  await expect(page.locator('.conversation-ownership')).toContainText('Responsável: Marina Costa (você)');
-  await expect(page.getByLabel('Mensagem para o paciente')).toBeEnabled();
+  await expect(page.locator('.conversation-ownership')).toContainText('com você');
+  await expect(page.getByLabel('Mensagem para Ana Beatriz Santos')).toBeEnabled();
 });
 
 test('falha de armazenamento é anunciada sem impedir navegação e busca vazia', async ({ page }) => {
@@ -72,11 +76,11 @@ test('falha de armazenamento é anunciada sem impedir navegação e busca vazia'
   await page.goto('/gestao/pacientes');
   await expect(page.getByRole('alert').filter({ hasText: 'Não foi possível carregar os dados salvos' })).toBeVisible();
   await expect(page.locator('#main-content')).toHaveAttribute('aria-busy', 'false');
-  await page.getByRole('searchbox', { name: 'Buscar paciente por nome ou telefone' }).fill('Busca fictícia sem correspondência');
+  await page.getByRole('searchbox', { name: 'Buscar paciente', exact: true }).fill('Busca fictícia sem correspondência');
   await expect(page.getByRole('heading', { name: 'Nenhum paciente encontrado' })).toBeVisible();
   await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
   await expect(page.locator('.data-table')).toBeVisible();
-  await page.getByRole('navigation', { name: 'Áreas de gestão' }).getByRole('link', { name: 'Equipe', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', { name: 'Equipe', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Profissionais de saúde', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Atendentes', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Atendentes', exact: true })).toHaveAttribute('aria-pressed', 'true');
