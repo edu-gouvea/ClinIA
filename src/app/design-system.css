@@ -5,6 +5,7 @@
 body {
   margin: 0;
   background: var(--bg);
+  font-family: var(--font-stack);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   font-size: var(--text-md);
@@ -36,14 +37,12 @@ h1,h2,h3,h4,p {
   margin: 0;
 }
 h1 {
-  font-weight: 600;
-  line-height: 1.25;
-  font-size: var(--text-title);
-  letter-spacing: -.8px;
+  font: var(--type-page);
+  letter-spacing: var(--type-page-tracking);
 }
 h2 {
   font-weight: 600;
-  letter-spacing: -.4px;
+  letter-spacing: 0;
   font-size: var(--text-lg);
 }
 h3 {
@@ -149,9 +148,9 @@ input:disabled,select:disabled {
   line-height: 20px;
   padding: var(--control-padding-block) var(--control-padding-inline);
   min-height: var(--control-height);
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
   gap: var(--space-2);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-medium);
 }
 .btn-primary {
   background: var(--green);
@@ -160,7 +159,8 @@ input:disabled,select:disabled {
 }
 .btn-secondary {
   background: var(--surface);
-  border-color: var(--border);
+  color: var(--ink);
+  border-color: var(--border-strong);
 }
 .btn-secondary:hover {
   background: var(--surface-hover);
@@ -182,36 +182,47 @@ input:disabled,select:disabled {
 .btn-danger:hover {
   background: var(--danger-bg);
 }
+/* Status badge: pastel background + ink of the same family; the text always
+ * names the state, so colour is never the only carrier of meaning. */
 .badge {
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
-  font-weight: 500;
-  padding: 2px var(--space-2);
+  height: 22px;
+  padding: 0 var(--space-2);
   gap: var(--space-1);
-  font-size: var(--text-xs);
-  line-height: 16px;
-  border-radius: var(--radius-sm);
+  font: var(--type-caption);
+  font-weight: 500;
+  border-radius: var(--radius-xs);
+  font-variant-numeric: tabular-nums;
 }
-.badge-green {
-  color: var(--green-ink);
-  background: var(--mint);
+.badge svg {
+  width: 12px;
+  height: 12px;
 }
-.badge-amber {
+.badge-success {
+  color: var(--success-ink);
+  background: var(--success-bg);
+}
+.badge-warning {
   color: var(--warning-ink);
   background: var(--warning-bg);
 }
-.badge-red {
+.badge-danger {
   color: var(--danger-ink);
   background: var(--danger-bg);
 }
-.badge-gray {
+.badge-neutral {
   color: var(--muted);
   background: var(--surface-muted);
 }
-.badge-blue {
+.badge-info {
   color: var(--info-ink);
   background: var(--info-bg);
+}
+.badge-ai {
+  color: var(--ai-ink);
+  background: var(--ai-bg);
 }
 .avatar {
   display: inline-flex;
@@ -595,7 +606,7 @@ input[readonly],textarea[readonly] {
   background: var(--surface);
   border: var(--border-width) solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   min-width: 0;
   padding: var(--panel-padding);
 }
@@ -611,8 +622,12 @@ input[readonly],textarea[readonly] {
   color: var(--disabled-ink);
   cursor: not-allowed;
 }
-.text-link,.show-slots {
+.text-link {
   min-height: 24px;
+}
+/* Numeric alignment for KPIs, tables, times and counters. */
+.tabular,time,.metric-value,.metric-card>strong,.data-table,.nav-count {
+  font-variant-numeric: tabular-nums;
 }
 ::selection {
   background: var(--selection-bg);
@@ -622,3 +637,11 @@ input[readonly],textarea[readonly] {
 /* Keep server route markup stable while browser-local data loads. */
 .app-content { min-width: 0; }
 .app-content[hidden] { display: none!important; }
+
+/* Page trail ("Gestão / Agenda") above the h1 — PageHeading `trail`. */
+.page-trail ol { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--space-1); padding: 0; list-style: none; font: var(--type-body-sm); color: var(--subtle); }
+.page-trail li + li::before { content: "/"; margin-right: 6px; color: var(--subtle); }
+.page-trail li[aria-current="page"] { color: var(--muted); }
+
+/* Menu footer note (e.g. the Visão gerencial period menu). */
+.menu-footer { margin-top: 4px; padding: 8px 8px 6px; border-top: 1px solid var(--border); font-size: 12px; line-height: 16px; color: var(--subtle); max-width: 232px; }

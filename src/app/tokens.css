@@ -1,81 +1,140 @@
-/* Shared semantic tokens and density profiles. See docs/DESIGN_SYSTEM.md. */
+/* Shared semantic tokens and density profiles.
+ * Neutrals are cool and nearly pure; green is reserved for brand, primary action
+ * and focus. Breakpoints live in src/lib/breakpoints.ts (640/768/1024/1280/1536)
+ * because media queries cannot read custom properties. */
 :root {
   color-scheme: light;
-  font-family: Inter, "Segoe UI", Arial, sans-serif;
-  --bg: #f4f6f5;
-  --surface: #ffffff;
-  --surface-subtle: #f8faf9;
-  --surface-muted: #eef2ef;
-  --surface-hover: #f0f4f2;
-  --surface-active: #eaf3ee;
-  --ink: #24382f;
-  --border: #e4eae6;
-  --border-strong: #d0dcd4;
+  --font-stack: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-stack);
+
+  /* Surfaces */
+  --bg: #fafafa;               /* chrome: sidebar, app background */
+  --canvas: #ffffff;           /* content area */
+  --surface: #ffffff;          /* cards, modals, popovers */
+  --surface-subtle: #f7f7f8;   /* table header, card footer */
+  --surface-muted: #f4f4f5;
+  --surface-hover: #f4f4f5;
+  --surface-active: #efeff1;
+  --surface-selected: var(--surface-active);
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --control-border: #87878f;   /* ≥3:1 on every surface, including selected */
+  --control-border-hover: #52525b;
+
+  /* Text */
+  --ink: #18181b;
+  --muted: #52525b;
+  --subtle: #6b6b74;           /* ≥4.5:1 on every surface, including hover/selected */
+
+  /* Brand */
   --green: #167654;
   --green-deep: #116144;
+  --green-active: #0c5239;
+  --green-ink: #116144;
   --on-green: #ffffff;
-  --mint: #edf5f0;
-  --green-ink: #336e50;
+  --mint: #eaf4ef;
+  --chart-marker: #3f3f46;        /* dashed "previous period" marker (≥3:1 on bars but faltas) */
+  --available-bg: #e6f3ec;       /* booking calendar: day with free times (ink ≥4.5:1) */
+  --available-bg-hover: #d2eadd;
   --accent-line: #8eb39c;
-  --warning-bg: #faf5e9;
-  --warning-ink: #87692f;
-  --warning-border: #e9dec3;
+
+  /* Status */
+  --success-bg: #eaf6ef;
+  --success-ink: #1e6b45;
+  --success-border: #bfdccb;
+  --warning-bg: #fbf3e2;
+  --warning-ink: #8a5a0a;
+  --warning-border: #ebddbe;
   --amber: var(--warning-ink);
-  --danger-bg: #fcf0ed;
-  --danger-ink: #a64940;
-  --danger-border: #edd3ce;
-  --info-bg: #eef3f4;
-  --info-ink: #52717a;
-  --avatar-bg: #edf0ea;
-  --avatar-ink: #576851;
-  --overlay: #101c1666;
-  --shadow-color: #193f2808;
+  --danger-bg: #fcedeb;
+  --danger-ink: #b03a2e;
+  --danger-border: #f1d0cb;
+  --info-bg: #eef4fc;
+  --info-ink: #1d5fb4;
+  --ai: #6d4ad6;
+  --ai-bg: #f3f0fd;
+  --ai-ink: #5b3cc4;
+
+  /* Data series */
+  --data-realizadas: #4caf7d;
+  --data-faltas: #c8473d;
+  --data-canceladas: #a1a1aa;
+  --data-em-aberto: #e4e4e7;
+
+  /* Status lines: the 3 px event stripe and chip dots. Mid-luminance, distinct from
+   * each other and from the brand green (success leans yellow-green). */
+  --status-warning-line: #d9971c;
+  --status-info-line: #3f7fd6;
+  --status-success-line: #6aa84f;
+  --status-danger-line: #d4493d;
+  --status-neutral-line: #a1a1aa;
+  /* Calendar half-hour rule, between --border and --surface. */
+  --grid-line-subtle: #f0f0f2;
+
+  --avatar-bg: #f4f4f5;
+  --avatar-ink: #3f3f46;
+  --overlay: #18181b66;
+  --shadow-color: #0000000d;
+
+  /* Derived */
+  --focus-ring: var(--green);
+  --disabled-bg: var(--surface-muted);
+  --disabled-ink: var(--muted);
+  --selection-bg: var(--surface-selected);
+  --selection-ink: var(--green-ink);
+  --selection-line: var(--green);
+
+  /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
-  --text-title: 26px;
-  --text-metric: 30px;
-  --radius: 12px;
-  --radius-lg: 16px;
-  --control-height: 36px;
-  --muted: #586c5e;
-  --subtle: #607267;
-  --control-border: #788c7f;
-  --control-border-hover: #586c5e;
-  --green-active: #0c5239;
-  --focus-ring: var(--green);
-  --disabled-bg: var(--surface-muted);
-  --disabled-ink: var(--muted);
-  --success-bg: var(--mint);
-  --success-ink: var(--green-ink);
-  --success-border: var(--accent-line);
-  --selection-bg: var(--surface-active);
-  --selection-ink: var(--green-ink);
-  --selection-line: var(--green);
   --space-7: 28px;
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
-  --text-micro: 11px;
+
+  /* Type scale (12px minimum everywhere) */
+  --type-caption: 400 12px/16px var(--font-stack);
+  --type-body-sm: 400 13px/20px var(--font-stack);
+  --type-body: 400 14px/20px var(--font-stack);
+  --type-title-sm: 600 15px/20px var(--font-stack);
+  --type-title: 600 16px/24px var(--font-stack);
+  --type-page: 600 24px/32px var(--font-stack);
+  --type-page-tracking: -0.4px;
+  --type-metric: 600 30px/36px var(--font-stack);
+  --type-metric-tracking: -0.6px;
+  /* Legacy size aliases, now mapped onto the scale above. */
+  --text-micro: 12px;
   --text-xs: 12px;
   --text-sm: 13px;
   --text-md: 14px;
   --text-lg: 16px;
   --text-xl: 18px;
+  --text-title: 24px;
+  --text-metric: 30px;
   --leading-tight: 1.25;
   --leading-normal: 1.5;
   --leading-relaxed: 1.65;
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
+
+  /* Radii: badge/chip 6 · button/input 8 · card/menu/tooltip 12 · modal/drawer 16 */
+  --radius-xs: 6px;
   --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
-  --shadow-sm: 0 1px 3px var(--shadow-color);
+
+  /* Elevation: 1 = shadow-sm, 2 = popover (+ border), 3 = dialog. Flat cards have none. */
+  --shadow-sm: 0 1px 2px var(--shadow-color);
   --shadow: var(--shadow-sm);
+  --shadow-popover: 0 8px 24px rgb(0 0 0 / .12);
   --shadow-dialog: 0 16px 48px var(--shadow-color);
+
   --border-width: 1px;
   --icon-size: 16px;
   --icon-control-size: 32px;
@@ -86,46 +145,68 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #101815;
-  --surface: #17231d;
-  --surface-subtle: #1b2821;
-  --surface-muted: #24342b;
-  --surface-hover: #263a2e;
-  --surface-active: #253f31;
-  --ink: #e4ede7;
-  --muted: #adbbb2;
-  --subtle: #a0b2a6;
-  --border: #2c3c32;
-  --border-strong: #40574a;
+  --bg: #101012;
+  --canvas: #141416;
+  --surface: #1a1a1e;
+  --surface-subtle: #1f1f23;
+  --surface-muted: #24242a;
+  --surface-hover: #242429;
+  --surface-active: #2a2a30;
+  --border: #2a2a30;
+  --border-strong: #3a3a42;
+  --control-border: #7a7a84;
+  --control-border-hover: #b4b4bc;
+  --ink: #f4f4f5;
+  --muted: #b4b4bc;
+  --subtle: #93939c;
   --green: #53bd89;
   --green-deep: #6bcf9d;
-  --on-green: #102219;
-  --mint: #21382b;
-  --green-ink: #a0d5b3;
-  --accent-line: #46795a;
-  --warning-bg: #383223;
-  --warning-ink: #ddc58b;
-  --warning-border: #665637;
-  --danger-bg: #392824;
-  --danger-ink: #f2b1a6;
-  --danger-border: #68443c;
-  --info-bg: #24353b;
-  --info-ink: #aacbd7;
-  --avatar-bg: #2c382b;
-  --avatar-ink: #b9cdb3;
-  --overlay: #060d0abc;
-  --shadow-color: #0000000c;
-  --control-border: #769382;
-  --control-border-hover: #adbbb2;
   --green-active: #83d9ad;
+  --green-ink: #7fd4a4;
+  --on-green: #0b1f15;
+  --mint: #16291f;
+  --chart-marker: #d4d4d8;
+  --available-bg: #183324;
+  --available-bg-hover: #21452f;
+  --accent-line: #46795a;
+  --success-bg: #15291e;
+  --success-ink: #7fd4a4;
+  --success-border: #2c5a40;
+  --warning-bg: #2e2510;
+  --warning-ink: #e8c26a;
+  --warning-border: #5a4a22;
+  --danger-bg: #33191a;
+  --danger-ink: #f2a39a;
+  --danger-border: #6a3a35;
+  --info-bg: #17243a;
+  --info-ink: #8db8f5;
+  --ai: #b8a6f5;
+  --ai-bg: #221c38;
+  --ai-ink: #c9bbf8;
+  --data-realizadas: #5cc08e;
+  --data-faltas: #f0857a;
+  --data-canceladas: #6b6b74;
+  --data-em-aberto: #34343b;
+  --status-warning-line: #e0a63f;
+  --status-info-line: #6ea6f0;
+  --status-success-line: #a3cf6d;
+  --status-danger-line: #ef7d71;
+  --status-neutral-line: #71717a;
+  --grid-line-subtle: #222227;
+  --avatar-bg: #2a2a30;
+  --avatar-ink: #d4d4d8;
+  --overlay: #000000b3;
+  --shadow-color: #00000066;
 }
 @theme inline {
   --color-primary: var(--green);
   --color-muted: var(--muted);
 }
+/* Control heights: compact 28 · standard 32 · comfortable 40.
+ * Block padding = (height − 20px line − 2px border) / 2. */
 :root, [data-density="standard"] {
-  --control-height: 36px;
-  --control-padding-block: 6px;
+  --control-height: 32px;
+  --control-padding-block: 5px;
   --control-padding-inline: 12px;
   --panel-padding: 16px;
   --section-gap: 16px;
@@ -135,8 +216,8 @@
   --field-gap: 4px;
 }
 [data-density="compact"] {
-  --control-height: 32px;
-  --control-padding-block: 4px;
+  --control-height: 28px;
+  --control-padding-block: 3px;
   --control-padding-inline: 8px;
   --panel-padding: 12px;
   --section-gap: 12px;
@@ -147,7 +228,7 @@
 }
 [data-density="comfortable"] {
   --control-height: 40px;
-  --control-padding-block: 8px;
+  --control-padding-block: 9px;
   --control-padding-inline: 12px;
   --panel-padding: 24px;
   --section-gap: 20px;

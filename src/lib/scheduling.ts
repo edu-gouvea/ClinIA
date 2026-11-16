@@ -59,17 +59,27 @@ export function agendaProfessionals(state: DemoState, appointments: Appointment[
     && (!specialty || p.specialties.includes(specialty) || recorded.has(p.id)));
 }
 
-export type CalendarColumn = { key: string; day: string; professional?: Professional; events: PositionedAppointment[]; width: number };
+/** Calendar layout constants. Columns are sized for a 13 px Inter name on one line
+ * (headers and cards truncate with ellipsis and expose the full name via title /
+ * aria-label), so width no longer depends on name length. At 1440 px the 64 px
+ * axis plus 4 × 200 px (professionals) or 5 × 167 px (weekdays) fit in the content
+ * area without horizontal scrolling. Lanes multiply the column minimum. */
+export const CALENDAR_AXIS_WIDTH = 64;
+export const CALENDAR_MIN_COLUMN_WIDTH = { professionals: 200, dates: 167 } as const;
+/** A weekday on which the clinic is closed (and holds no appointments) stays in the
+ * week as a compact column: weekend care remains possible without costing width. */
+export const CALENDAR_CLOSED_COLUMN_WIDTH = 96;
+
+export type CalendarColumn = { key: string; day: string; professional?: Professional; events: PositionedAppointment[]; width: number; closed: boolean };
 export function calendarColumns(state: DemoState, days: string[], appointments: Appointment[], professionals: Professional[], byProfessional: boolean): CalendarColumn[] {
   const definitions = byProfessional
     ? professionals.map(professional => ({ key: professional.id, day: days[0], professional }))
     : days.map(day => ({ key: day, day, professional: undefined }));
-  const names = new Map(state.patients.map(p => [p.id, p.name]));
   return definitions.map(column => {
     const events = layoutAppointments(appointments.filter(a => a.date === column.day && (!column.professional || a.professionalId === column.professional.id)));
     const lanes = Math.max(1, ...events.map(event => event.lanes));
-    // Grow horizontally for readable names; never change the time scale.
-    const nameWidth = Math.max(0, ...events.map(({ appointment }) => Math.ceil((names.get(appointment.patientId)?.length ?? 0) * 7.5 / (appointment.duration < 30 ? 1 : 2)) + 24));
-    return { ...column, events, width: Math.max(byProfessional ? 236 : 208, nameWidth) * lanes };
+    const weekday = new Date(`${column.day}T12:00:00Z`).getUTCDay();
+    const closed = !byProfessional && !events.length && !state.clinic.hours.some(slot => slot.day === weekday);
+    return { ...column, events, closed, width: closed ? CALENDAR_CLOSED_COLUMN_WIDTH : CALENDAR_MIN_COLUMN_WIDTH[byProfessional ? 'professionals' : 'dates'] * lanes };
   });
 }

@@ -63,6 +63,7 @@ export function createDemoState(referenceDate = todayInRecife()): DemoState {
 
   // All dates are relative to the saved reference day. The same reference always creates the same demo.
   // Two complete 30-day periods (plus a buffer) support equivalent comparisons.
+  const nowMinute = minutes(state.now.slice(11, 16));
   for (let offset = -65; offset <= 12; offset++) {
     const date = addDays(referenceDate, offset);
     state.professionals.forEach((professional, professionalIndex) => {
@@ -81,7 +82,9 @@ export function createDemoState(referenceDate = todayInRecife()): DemoState {
           if (offset > 0 && (index + offset + professionalIndex) % 3 === 0) continue;
           const numeric = (offset + 65) * 13 + professionalIndex * 7 + index;
           let status: AppointmentStatus;
-          if (offset < 0 || (offset === 0 && start + 30 < 10 * 60 + 15)) {
+          // Outcomes only for appointments that already ended: today, anything starting at
+          // or after `now` stays open (agendada/confirmada), never "realizada" or "falta".
+          if (offset < 0 || (offset === 0 && start + 30 <= nowMinute)) {
             status = numeric % 13 === 0 ? 'cancelada' : numeric % 11 === 0 ? 'falta' : numeric % 17 === 0 ? 'agendada' : 'realizada';
           } else {
             status = numeric % 3 === 0 ? 'agendada' : 'confirmada';

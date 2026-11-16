@@ -37,16 +37,23 @@ async function expectFits(page: Page, width: number, height: number) {
   expect(composer.y + composer.height).toBeLessThanOrEqual(height + 1);
 }
 
+const composerLabel = 'Mensagem para Ana Beatriz Santos';
+
 test('painéis rolam independentemente e novas mensagens preservam leitura ou acompanham o envio', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page);
+  // Ana's conversation is with the current user, so it opens in "Em atendimento", selected in the list.
+  await expect(page.getByRole('tab', { name: /^Em atendimento/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.conversation-list-item[aria-current="true"]')).toHaveAttribute('data-conversation-id', 'conversation-1');
+  await expect(page.locator('.conversation-ownership')).toContainText('com você');
+  // The 30 extra threads are closed: "Finalizadas" (with Ana still open) makes the list overflow.
+  await open(page, '/conversas?view=finalizadas&id=conversation-1');
   await expectFits(page, 1440, 900);
   const log = page.getByRole('log');
-  const patient = page.getByRole('complementary', { name: 'Dados do paciente' });
+  // The patient data now lives in the "Paciente" tab of the contextual panel.
+  const patient = page.getByRole('tabpanel', { name: 'Paciente' });
   const list = page.getByRole('region', { name: 'Conversas disponíveis' });
   for (const panel of [log, patient, list]) expect(await panel.evaluate(el => el.scrollHeight > el.clientHeight)).toBeTruthy();
-  await expect(page.locator('.conversation-list-item').first()).toHaveAttribute('data-status', 'aguardando');
-  await expect(page.locator('.conversation-ownership')).toContainText('Responsável: Marina Costa (você)');
   const messagePosition = await log.evaluate(el => el.scrollTop);
   await patient.evaluate(el => { el.scrollTop = el.scrollHeight; });
   await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
@@ -55,7 +62,9 @@ test('painéis rolam independentemente e novas mensagens preservam leitura ou ac
   await log.evaluate(el => { el.scrollTop = 0; });
   const latest = page.getByRole('button', { name: 'Últimas mensagens', exact: true });
   await expect(latest).toBeVisible();
-  await page.getByRole('button', { name: 'Simular mensagem recebida', exact: true }).click();
+  // "Simular mensagem recebida" moved from the composer footer to the ⋯ menu.
+  await page.getByRole('button', { name: 'Mais ações', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Simular mensagem recebida', exact: true }).click();
   const simulator = page.getByRole('dialog', { name: 'Simular mensagem recebida' });
   await simulator.getByLabel('Mensagem do paciente').fill('Nova informação fictícia enquanto o histórico é lido.');
   await simulator.getByRole('button', { name: 'Receber mensagem', exact: true }).click();
@@ -65,45 +74,51 @@ test('painéis rolam independentemente e novas mensagens preservam leitura ou ac
   await latest.click();
   await expect.poll(() => log.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThanOrEqual(2);
   await expect(latest).toHaveCount(0);
-  const input = page.getByLabel('Mensagem para o paciente');
+  const input = page.getByLabel(composerLabel);
   await input.fill('Resposta fictícia'); await input.press('Shift+Enter'); await input.pressSequentially('com duas linhas.'); await input.press('Enter');
   await expect(input).toHaveValue('');
   await expect(log).toContainText('com duas linhas.');
   await expect.poll(() => log.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThanOrEqual(2);
   await expectFits(page, 1440, 900);
-  await page.getByRole('button', { name: 'Ativar modo noturno', exact: true }).click();
+  await page.getByRole('button', { name: 'Tema escuro', exact: true }).click();
   await page.screenshot({ path: 'docs/qa/conversas-ergonomia-noturna.png' });
 });
 
-test('viewport reduzido mantém composição acessível e painel direito; filtros e voltar preservam contexto', async ({ page }) => {
+test('viewport reduzido mantém composição acessível e painel; abas e voltar preservam contexto', async ({ page }) => {
   for (const [width, height] of [[1280, 720], [1024, 768], [768, 844], [390, 844], [390, 500], [640, 480]]) {
     await page.setViewportSize({ width, height }); await open(page);
     await expectFits(page, width, height);
-    await expect(page.getByLabel('Mensagem para o paciente')).toBeVisible();
-    const patient = page.getByRole('complementary', { name: 'Dados do paciente' });
-    if (width >= 768) {
-      await expect(patient).toBeVisible();
+    await expect(page.getByLabel(composerLabel)).toBeVisible();
+    const toggle = page.getByRole('button', { name: 'Painel do paciente e assistente', exact: true });
+    if (width >= 1280) {
+      // ≥1280: the panel is a third column, open by default.
+      const panel = page.getByRole('complementary', { name: 'Paciente e assistente' });
+      await expect(panel).toBeVisible();
       const chat = (await page.locator('.conversation-detail').boundingBox())!;
-      expect((await patient.boundingBox())!.x).toBeGreaterThanOrEqual(chat.x + chat.width - 1);
+      expect((await panel.boundingBox())!.x).toBeGreaterThanOrEqual(chat.x + chat.width - 1);
     } else {
-      await expect(patient).toHaveCount(0);
-      const trigger = page.getByRole('button', { name: 'Mostrar dados do paciente', exact: true });
-      await trigger.click();
-      const drawer = page.getByRole('dialog', { name: 'Dados do paciente', exact: true });
+      // Below 1280 it is closed by default and opens as a drawer (right) or full screen (<768).
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await toggle.click();
+      const drawer = page.getByRole('dialog', { name: 'Paciente e assistente', exact: true });
       await expect(drawer.getByRole('link', { name: 'Ver cadastro', exact: true })).toBeVisible();
-      await page.keyboard.press('Escape'); await expect(drawer).toHaveCount(0); await expect(trigger).toBeFocused();
+      const box = (await drawer.boundingBox())!;
+      expect(box.x + box.width).toBeCloseTo(width, 0);
+      if (width < 768) expect(box.width).toBeCloseTo(width, 0);
+      await page.keyboard.press('Escape'); await expect(drawer).toHaveCount(0); await expect(toggle).toBeFocused();
     }
     if (width === 390 && height === 844) await page.screenshot({ path: 'docs/qa/conversas-ergonomia-mobile.png' });
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, '/conversas?status=aguardando');
-  const filter = page.getByLabel('Situação da conversa');
-  expect((await filter.boundingBox())!.width).toBeGreaterThan(250);
+  const pending = page.getByRole('tab', { name: /^Pendentes/ });
+  await expect(pending).toHaveAttribute('aria-selected', 'true');
+  expect((await page.getByRole('tablist', { name: 'Situação das conversas' }).boundingBox())!.width).toBeLessThanOrEqual(390);
   await expect(page.locator('.conversation-list-item')).toHaveCount(seed.conversations.filter(c => c.status === 'aguardando').length);
   await page.locator('.conversation-list-item').first().click();
   await expect(page.locator('.conversation-detail')).toBeVisible();
   await page.getByRole('button', { name: 'Voltar para lista de conversas', exact: true }).click();
-  await expect(filter).toHaveValue('aguardando');
+  await expect(page.getByRole('tab', { name: /^Pendentes/ })).toHaveAttribute('aria-selected', 'true');
   await expectFitsWithoutComposer(page, 390, 844);
 });
 

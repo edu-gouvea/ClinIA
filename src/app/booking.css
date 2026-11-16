@@ -1,0 +1,157 @@
+/* Booking ("Novo agendamento" / "Remarcar consulta") and "Detalhes da consulta".
+ * Tokens only; breakpoints from lib/breakpoints. */
+
+/* ---------- Booking ---------- */
+.modal.booking-modal { width: 800px; padding: 0; border-radius: var(--radius-lg); display: flex; flex-direction: column; }
+.booking-modal .modal-heading { margin: 0; padding: 14px 16px 14px 20px; border-bottom: 1px solid var(--border); }
+.booking-modal .modal-heading h2 { font-size: 16px; line-height: 24px; font-weight: 600; }
+.booking-modal .modal-heading .btn-icon { color: var(--muted); }
+.booking-form { display: flex; flex-direction: column; min-height: 0; }
+.booking-error { margin: 16px 24px 0; }
+.booking-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr) 180px; min-height: 384px; }
+.booking-summary { display: flex; flex-direction: column; gap: 14px; padding: 16px 20px 16px 18px; border-right: 1px solid var(--border); min-width: 0; }
+.booking-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+/* Model density: 32 px controls inside this dialog (the Modal defaults to comfortable/40). */
+.booking-modal { --control-height: 32px; --control-padding-block: 5px; }
+.booking-summary select, .booking-summary input.readonly-field { height: 32px; min-height: 32px; padding-block: 0; font-size: 13px; }
+.booking-footer .btn { min-height: 32px; height: 32px; font-size: 13px; }
+.booking-label { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--muted); }
+.booking-hint { font-size: 12px; line-height: 16px; color: var(--subtle); }
+.booking-summary input.booking-static:not([type=checkbox]):not([type=color]):not([type=range]) { min-height: 0; height: auto; padding: 0; border: 0; background: none; color: var(--ink); font-size: 13px; line-height: 20px; cursor: default; }
+.booking-summary input.booking-static:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+/* Model: neutral track, the pressed option is a white "chip" (no green underline). */
+.booking-segmented { display: flex; width: 100%; padding: 2px; border: 0; background: var(--surface-muted); border-radius: var(--radius-sm); }
+.booking-segmented button { flex: 1 1 0; height: 26px; min-height: 26px; padding: 0 6px; border-radius: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.booking-segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px var(--shadow-color), 0 0 0 1px var(--border-strong); }
+.booking-current { display: flex; flex-direction: column; gap: 2px; padding-top: 14px; border-top: 1px solid var(--border); }
+.booking-current span { font-size: 12px; line-height: 16px; color: var(--subtle); }
+.booking-current strong { font-size: 13px; line-height: 20px; font-weight: 500; color: var(--ink); }
+
+.booking-month { padding: 16px 20px; min-width: 0; }
+.mini-calendar-lg { gap: 12px; }
+.mini-calendar-lg .mini-calendar-heading { gap: 4px; }
+.mini-calendar-lg .mini-calendar-title { flex: 1 1 auto; font-size: 15px; line-height: 20px; font-weight: 600; }
+.mini-calendar-lg .mini-calendar-title span { color: var(--subtle); font-weight: 500; }
+.mini-calendar-lg th { height: 24px; font-size: 11px; font-weight: 500; color: var(--subtle); letter-spacing: .2px; }
+.mini-calendar-lg td { padding: 2px; }
+.mini-calendar-lg .mini-day { width: 100%; max-width: 48px; height: 36px; border-radius: var(--radius-sm); font-size: 14px; color: var(--ink); }
+.mini-calendar-lg .mini-day.is-today { box-shadow: none; color: var(--ink); font-weight: 600; }
+.mini-calendar-lg .mini-day > i { bottom: 6px; background: var(--green); }
+.mini-calendar-lg .mini-day.is-available { background: var(--available-bg); font-weight: 500; }
+.mini-calendar-lg .mini-day.is-available:hover { background: var(--available-bg-hover); }
+.mini-calendar-lg .mini-day.is-disabled { color: var(--subtle); background: none; cursor: default; }
+.mini-calendar-lg .mini-day.is-disabled:hover { background: none; }
+.mini-calendar-lg .mini-day.is-selected, .mini-calendar-lg .mini-day.is-selected:hover { background: var(--green); color: var(--on-green); font-weight: 600; }
+.mini-calendar-lg .mini-day.is-selected > i { background: var(--on-green); }
+.mini-calendar-lg .mini-day:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.booking-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--subtle); }
+.booking-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-available { width: 14px; height: 14px; border-radius: 4px; background: var(--available-bg); box-shadow: inset 0 0 0 1px var(--border); }
+.legend-today { width: 4px; height: 4px; border-radius: 50%; background: var(--green); }
+
+.booking-times { display: flex; flex-direction: column; gap: 2px; padding: 16px 14px; border-left: 1px solid var(--border); min-width: 0; }
+.booking-times h3 { font-size: 14px; line-height: 20px; font-weight: 600; }
+.booking-notice:empty { display: none; }
+.booking-notice { margin-top: 6px; padding: 6px 8px; border-radius: var(--radius-xs); background: var(--warning-bg); color: var(--warning-ink); font-size: 12px; line-height: 16px; }
+.booking-slots { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 6px; max-height: 330px; margin-top: 8px; padding: 2px; overflow-y: auto; }
+.booking-slot { height: 30px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 500; transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease; }
+.booking-slot:hover { border-color: var(--green); color: var(--green-ink); }
+.booking-slot[aria-selected="true"] { border-color: var(--green); background: var(--green); color: var(--on-green); }
+.booking-slot:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.booking-empty { margin-top: 10px; font-size: 13px; line-height: 20px; color: var(--muted); }
+.booking-link { align-self: flex-start; min-height: 28px; margin-top: 8px; padding: 0; border: 0; background: none; color: var(--green-ink); font-size: 13px; font-weight: 600; }
+.booking-link:hover { text-decoration: underline; }
+.booking-custom { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.booking-custom .temporal-field { width: 100%; }
+
+.booking-footer { position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg); }
+.booking-line { flex: 1 1 auto; min-width: 0; font-size: 13px; line-height: 20px; color: var(--ink); }
+.booking-line.is-empty { color: var(--subtle); }
+
+/* ---------- Details ---------- */
+.modal.details-modal { width: 680px; padding: 0; border-radius: var(--radius-lg); }
+.details-modal .modal-heading { align-items: flex-start; margin: 0; padding: 20px 24px 18px; border-bottom: 1px solid var(--border); }
+.modal-custom-header { flex: 1 1 auto; min-width: 0; }
+.details-header { display: flex; flex-direction: column; gap: 6px; }
+.details-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; color: var(--muted); }
+.details-title { font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -.2px; }
+.details-people { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; line-height: 20px; color: var(--muted); }
+.details-patient { display: inline-flex; align-items: center; gap: 2px; color: var(--green-ink); font-weight: 600; text-decoration: none; border-radius: 4px; }
+.details-patient:hover { text-decoration: underline; }
+.details-body { display: flex; flex-direction: column; gap: 20px; padding: 20px 24px; }
+.details-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.details-meta > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; min-width: 0; }
+.details-meta > div + div { border-left: 1px solid var(--border); }
+.details-meta dt { font-size: 12px; line-height: 16px; color: var(--subtle); }
+.details-meta dd { margin: 0; font-size: 13px; line-height: 20px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.details-meta dd small { display: block; font-size: 12px; line-height: 16px; font-weight: 400; color: var(--subtle); }
+.details-cancelled { padding: 10px 14px; border-radius: 10px; background: var(--surface-muted); color: var(--ink); font-size: 13px; line-height: 20px; }
+.details-note-hint { font-size: 12px; line-height: 16px; color: var(--subtle); }
+.details-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.details-section-head h3, .details-history h3 { display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 20px; font-weight: 600; }
+.details-section-head h3 svg, .details-history h3 svg { color: var(--muted); }
+.details-section-head span { font-size: 12px; line-height: 16px; color: var(--subtle); }
+.note-composer { border: 1px solid var(--control-border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.note-composer:focus-within { border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); }
+.note-composer textarea { display: block; width: 100%; min-height: 76px; padding: 12px 14px; border: 0; border-radius: 0; background: transparent; color: var(--ink); font: var(--type-body); line-height: 22px; resize: vertical; outline: none; box-shadow: none; }
+.note-composer-footer { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-top: 1px solid var(--border); background: var(--bg); }
+.note-composer-footer small { margin-right: auto; font-size: 12px; line-height: 16px; color: var(--subtle); }
+.note-card-current { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; }
+.note-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.note-card-head strong { font-size: 13px; line-height: 20px; font-weight: 500; }
+.note-card-head > span { font-size: 12px; line-height: 16px; color: var(--subtle); }
+.note-card-head .note-edit { margin-left: auto; height: 28px; min-height: 28px; padding: 0 10px; font-size: 13px; }
+.note-body { font-size: 14px; line-height: 22px; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-card-current .note-versions { margin: 0; padding: 0; border: 0; background: none; }
+.note-card-current .note-versions summary { font-size: 12px; line-height: 16px; color: var(--muted); cursor: pointer; }
+.note-card-current .note-versions ol { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.note-card-current .note-versions li { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-subtle); }
+.note-version-meta { display: block; font-size: 12px; line-height: 16px; color: var(--subtle); }
+.note-card-current .note-versions p { margin-top: 4px; font-size: 13px; line-height: 20px; color: var(--ink); white-space: pre-wrap; }
+.details-history ol { display: flex; flex-direction: column; margin: 10px 0 0; padding: 0; list-style: none; }
+.details-history li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: baseline; column-gap: 10px; padding: 6px 0; font-size: 13px; line-height: 20px; }
+.details-history li + li { border-top: 1px solid var(--border); }
+.details-history li > i { width: 8px; height: 8px; border-radius: 50%; background: var(--status-neutral-line); transform: translateY(-1px); }
+.details-history li[data-tone="warning"] > i { background: var(--status-warning-line); }
+.details-history li[data-tone="info"] > i { background: var(--status-info-line); }
+.details-history li[data-tone="success"] > i { background: var(--status-success-line); }
+.details-history li[data-tone="danger"] > i { background: var(--status-danger-line); }
+.details-event { min-width: 0; color: var(--muted); }
+.details-event strong { color: var(--ink); font-weight: 600; }
+.details-history time { font-size: 12px; line-height: 16px; color: var(--subtle); white-space: nowrap; }
+.details-more { margin-top: 4px; }
+.details-footer { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border); background: var(--bg); }
+.details-footer-note { margin-right: auto; font-size: 12px; line-height: 16px; color: var(--subtle); }
+.details-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.details-footer .menu-list { top: auto; bottom: calc(100% + 4px); }
+.menu-item.is-danger { color: var(--danger-ink); }
+.menu-item.is-danger:hover, .menu-item.is-danger:focus-visible { background: var(--danger-bg); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1023px) {
+  .booking-grid { grid-template-columns: 220px minmax(0, 1fr); }
+  .booking-times { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--border); padding: 20px 24px; }
+  .booking-slots { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+}
+@media (max-width: 767px) {
+  .booking-grid { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .booking-summary { border-right: 0; padding: 16px; }
+  .booking-month { padding: 16px; border-top: 1px solid var(--border); }
+  .booking-times { padding: 16px; }
+  .booking-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: none; }
+  .booking-slot { height: 44px; }
+  .mini-calendar-lg .mini-day { height: 44px; }
+  .booking-segmented button, .booking-link { min-height: 44px; height: 44px; }
+  .booking-footer { flex-wrap: wrap; padding: 12px 16px; }
+  .booking-line { flex-basis: 100%; }
+  .booking-footer .btn, .details-footer .btn, .details-footer .btn-icon { min-height: 44px; }
+  .booking-summary select, .booking-summary input.readonly-field { height: 44px; min-height: 44px; }
+  .details-footer .btn-icon { width: 44px; }
+  .booking-modal .modal-heading, .details-modal .modal-heading { padding: 16px; }
+  .details-body { padding: 16px; }
+  .details-meta { grid-template-columns: minmax(0, 1fr); }
+  .details-meta > div + div { border-left: 0; border-top: 1px solid var(--border); }
+  .details-footer { padding: 12px 16px; }
+  .details-actions { flex-wrap: wrap; width: 100%; }
+  .details-actions > .btn { flex: 1 1 auto; }
+}

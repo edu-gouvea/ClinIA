@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, Bot, CheckCheck, CircleAlert, Clock3, RotateCcw } from 'lucide-react';
+import { ArrowDown, CheckCheck, CircleAlert, Clock3, RotateCcw, Sparkles } from 'lucide-react';
 import { Button, EmptyState } from '@/components/ui';
 import { CLINIC_TIMEZONE } from '@/lib/date';
 import type { Conversation, DemoState, Message } from '@/lib/types';
 
-function authorLabel(message: Message, state: DemoState, patientName: string) {
-  if (message.author === 'paciente') return patientName;
-  if (message.author === 'ia') return 'IA de atendimento';
+/** Patient bubbles carry no label; IA and staff are labelled ("Você" for the current user). */
+function authorLabel(message: Message, state: DemoState) {
+  if (message.author === 'ia') return 'Assistente IA';
+  if (message.authorId === state.currentUserId) return 'Você';
   return state.users.find(user => user.id === message.authorId)?.name ?? 'Atendente';
 }
 const dayFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: CLINIC_TIMEZONE, day: 'numeric', month: 'long', year: 'numeric' });
@@ -54,17 +55,18 @@ export function MessageHistory({ state, conversation, patientName, messages, pen
         const newSession = !previous || previous.sessionId !== message.sessionId;
         const newDay = !previous || day(previous.at) !== day(message.at);
         const outgoing = message.author === 'humano';
+        const right = message.author === 'humano' || message.author === 'ia';
         const delivery = message.id === pendingId ? 'pendente' : message.delivery;
         return <div key={message.id} data-message-id={message.id} className="conversation-message-entry">
-          {(newSession || newDay) && <div className="conversation-date-separator"><span>{day(message.at)}{newSession && ` · ${message.sessionId === conversation.sessionId ? 'Sessão atual' : 'Sessão anterior'}`}</span></div>}
-          {message.author === 'evento' ? <div className="conversation-message-event">{message.text}<time dateTime={message.at}>{formatTime(message.at)}</time></div>
-            : <article className={`conversation-message ${outgoing ? 'is-outgoing' : ''}`} data-author={message.author}>
+          {(newSession || newDay) && <div className="conversation-date-separator"><span className="tabular">{day(message.at)}{newSession && ` · ${message.sessionId === conversation.sessionId ? 'Sessão atual' : 'Sessão anterior'}`}</span></div>}
+          {message.author === 'evento' ? <p className="conversation-message-event">{message.text}<span className="conversation-event-time"> · <time dateTime={message.at}>{formatTime(message.at)}</time></span></p>
+            : <article className={`conversation-message${right ? ' is-outgoing' : ''}`} data-author={message.author} aria-label={message.author === 'paciente' ? patientName : authorLabel(message, state)}>
               <div className="conversation-bubble">
-                <div className="conversation-message-author">{message.author === 'ia' && <Bot size={13} aria-hidden="true" />}{authorLabel(message, state, patientName)}</div>
+                {message.author !== 'paciente' && <div className="conversation-message-author">{message.author === 'ia' && <Sparkles size={12} aria-hidden="true" />}{authorLabel(message, state)}</div>}
                 <p>{message.text}</p>
-                <div className="conversation-message-meta"><time dateTime={message.at}>{formatTime(message.at)}</time>{outgoing && (delivery === 'pendente' ? <><Clock3 size={12} /><span>Enviando…</span></> : delivery === 'falha' ? <span className="conversation-message-failed"><CircleAlert size={12} />Falha no envio</span> : <><CheckCheck size={13} /><span>Enviada</span></>)}</div>
-                {outgoing && delivery === 'falha' && <button type="button" disabled={busy || !owned} className="conversation-retry" onClick={() => onRetry(message)}><RotateCcw size={13} />Tentar novamente</button>}
               </div>
+              <div className="conversation-message-meta tabular"><time dateTime={message.at}>{formatTime(message.at)}</time>{outgoing && (delivery === 'pendente' ? <><span aria-hidden="true">·</span><Clock3 size={12} aria-hidden="true" /><span>Enviando…</span></> : delivery === 'falha' ? <><span aria-hidden="true">·</span><span className="conversation-message-failed"><CircleAlert size={12} aria-hidden="true" />Falha no envio</span></> : <><span aria-hidden="true">·</span><span className="conversation-message-sent"><CheckCheck size={13} aria-hidden="true" />Enviada</span></>)}</div>
+              {outgoing && delivery === 'falha' && <button type="button" disabled={busy || !owned} className="conversation-retry" onClick={() => onRetry(message)}><RotateCcw size={13} aria-hidden="true" />Tentar novamente</button>}
             </article>}
         </div>;
       })}

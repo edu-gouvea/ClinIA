@@ -6,13 +6,13 @@ import { Button, Field, Modal } from '@/components/ui';
 import { DateInput, TimeInput } from '@/components/date-time-fields';
 import { addDays, dateTime, formatDate } from '@/lib/date';
 import { appointmentEnd, getBlockConflicts, isOpenAppointment } from '@/lib/scheduling';
-import { appointmentStatusLabels } from '@/lib/appointment-presentation';
+import { appointmentStatusLabels } from '@/lib/status-presentation';
 import type { Appointment, Block } from '@/lib/types';
 import { AppointmentForm } from './appointment-form';
 
-export function BlockForm({ block, professionalId, onClose }: { block?: Block; professionalId: string; onClose: (saved?: boolean) => void }) {
+export function BlockForm({ block, professionalId, initialDate, onClose }: { block?: Block; professionalId: string; initialDate?: string; onClose: (saved?: boolean) => void }) {
   const { state, act } = useDemo();
-  const [input, setInput] = useState<Omit<Block, 'id'>>(() => block ? { professionalId: block.professionalId, date: block.date, start: block.start, end: block.end, reason: block.reason } : { professionalId, date: addDays(state.referenceDate, 1), start: '12:00', end: '13:00', reason: '' });
+  const [input, setInput] = useState<Omit<Block, 'id'>>(() => block ? { professionalId: block.professionalId, date: block.date, start: block.start, end: block.end, reason: block.reason } : { professionalId, date: initialDate && initialDate >= state.referenceDate ? initialDate : addDays(state.referenceDate, 1), start: '12:00', end: '13:00', reason: '' });
   const [step, setStep] = useState<'form' | 'review'>('form');
   const [editing, setEditing] = useState<Appointment>(); const [cancelling, setCancelling] = useState<Appointment>();
   const [cancelReason, setCancelReason] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);

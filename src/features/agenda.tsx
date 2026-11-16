@@ -1,81 +1,208 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowUpRight, CalendarDays, CalendarOff, ChevronLeft, ChevronRight, Clock3, Filter, MessageSquareText, Plus } from 'lucide-react';
+import { ArrowLeft, CalendarRange, ChevronLeft, ChevronRight, Clock3, ListChecks, Lock, Plus } from 'lucide-react';
 import { useDemo } from '@/components/demo-provider';
-import { Button, EmptyState, PageHeading } from '@/components/ui';
-import { DateInput, parseDateInput } from '@/components/date-time-fields';
-import { addDays, dateTime, formatDate, formatPeriod, weekStart } from '@/lib/date';
-import { getAvailability, getFreeSlots } from '@/lib/metrics';
-import { agendaProfessionals, agendaView, appointmentEnd, cancellationReason, isOpenAppointment } from '@/lib/scheduling';
-import { appointmentStatusLabels } from '@/lib/appointment-presentation';
+import { Button, Drawer, EmptyState, PageHeading, useIsNarrow, useMediaQuery, type MenuItem } from '@/components/ui';
+import { parseDateInput } from '@/components/date-time-fields';
+import { addDays, weekStart } from '@/lib/date';
+import { getFreeSlots } from '@/lib/metrics';
+import { agendaProfessionals, isOpenAppointment } from '@/lib/scheduling';
+import { countByStatus, isClinicClosed, matchesAgendaStatus, rangeTitle, rescheduleRequestIds, resolveAgendaView, statusChipLabels, statusChipOrder } from '@/lib/agenda-presentation';
+import { appointmentStatusTones } from '@/lib/status-presentation';
+import type { Appointment, Block, Professional } from '@/lib/types';
+// Compatibility re-export for modules (including the Eng_de_Software copy) that import from here.
+export { appointmentStatusLabels, appointmentStatusTones } from '@/lib/status-presentation';
 import { AppointmentForm } from './agenda/appointment-form';
 import { AppointmentDetails } from './agenda/appointment-details';
-import { CalendarGrid } from './agenda/calendar-grid';
+import { BlockForm } from './agenda/block-form';
+import { CalendarCard, slotKey } from './agenda/calendar-grid';
+import { AgendaDayTable } from './agenda/agenda-list';
+import { ActiveFilterChips, DatePicker, FiltersPopover, ProfessionalPicker, shiftDate } from './agenda/agenda-toolbar';
+import { ProfessionalAvatar } from './agenda/professional-avatar';
+import { DayPanel } from './agenda/day-panel';
+import { breakpointQuery } from '@/lib/breakpoints';
 export { AppointmentForm } from './agenda/appointment-form';
-export { appointmentStatusLabels, appointmentStatusTones } from '@/lib/appointment-presentation';
+
+const byTime = (a: Appointment, b: Appointment) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`);
 
 export function Agenda() {
   const { state } = useDemo(); const params = useSearchParams(); const router = useRouter();
+  const narrow = useIsNarrow();
+  const docked = useMediaQuery(breakpointQuery('lg'), true);
   const date = parseDateInput(params.get('date') || '') || state.referenceDate;
   const professionalId = params.get('professional') ?? ''; const patientId = params.get('patient') ?? '';
   const specialty = params.get('specialty') ?? ''; const status = params.get('status') ?? (params.get('planned') === '1' ? 'previstas' : '');
-  const view = agendaView(professionalId);
+  const view = resolveAgendaView(params);
   const from = parseDateInput(params.get('from') || ''); const to = parseDateInput(params.get('to') || '');
   const hasRange = !!from || !!to;
-  const periodStart = from ?? (view === 'week' ? weekStart(date) : date);
-  const periodEnd = to ?? (view === 'week' ? addDays(weekStart(date), 6) : date);
   const context = params.get('context');
   const editRequested = state.appointments.find(a => a.id === params.get('edit'));
   const editing = editRequested && isOpenAppointment(editRequested) ? editRequested : undefined;
   const detail = state.appointments.find(a => a.id === params.get('appointment'));
-  const [expandedSlots, setExpandedSlots] = useState<string[]>([]);
-  const appointments = state.appointments.filter(a => a.date >= periodStart && a.date <= periodEnd && (!professionalId || a.professionalId === professionalId) && (!patientId || a.patientId === patientId) && (!specialty || a.specialty === specialty)
-    && (!status || (status === 'previstas' ? isOpenAppointment(a) : status === 'pendente' ? isOpenAppointment(a) && new Date(dateTime(a.date, a.start)).getTime() + a.duration * 60000 <= new Date(state.now).getTime() : a.status === status)))
-    .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`));
-  const days = view === 'week' ? Array.from({ length: 7 }, (_, i) => addDays(weekStart(date), i)) : [date];
-  const calendarProfessionals = agendaProfessionals(state, appointments, professionalId, specialty);
-  const shownProfessionals = state.professionals.filter(p => p.active && (!professionalId || p.id === professionalId) && (!specialty || p.specialties.includes(specialty)));
-  const blocksStart = professionalId ? weekStart(date) : date;
-  const blocksEnd = professionalId ? addDays(blocksStart, 6) : date;
-  const blocks = state.blocks.filter(b => b.date >= blocksStart && b.date <= blocksEnd
-    && (professionalId ? b.professionalId === professionalId : !specialty || state.professionals.find(p => p.id === b.professionalId)?.specialties.includes(specialty)))
-    .sort((a, b) => `${a.date}${a.start}${a.id}`.localeCompare(`${b.date}${b.start}${b.id}`));
-  function update(changes: Record<string, string | null>) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [blockDraft, setBlockDraft] = useState<{ professionalId: string; date: string } | null>(null);
+  const [saved, setSaved] = useState<{ id?: string; before: Set<string> } | null>(null);
+  const [mobileIndex, setMobileIndex] = useState(0);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+
+  useEffect(() => {
+    if (!selected || !docked) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('.modal-overlay, .drawer-overlay, .popover, .menu-list')) return;
+      closeSelection();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+  useEffect(() => { if (!saved) return; const timer = setTimeout(() => setSaved(null), 1400); return () => clearTimeout(timer); }, [saved]);
+
+  const scoped = (a: Appointment) => (!patientId || a.patientId === patientId) && (!specialty || a.specialty === specialty);
+  const filtered = state.appointments.filter(a => scoped(a) && (!professionalId || a.professionalId === professionalId));
+  const start = weekStart(date);
+  // The week always shows all seven days; closed days become compact columns.
+  const days = view === 'semana' ? Array.from({ length: 7 }, (_, i) => addDays(start, i)) : [date];
+  const periodStart = hasRange ? from ?? date : days[0];
+  const periodEnd = hasRange ? to ?? date : days.at(-1)!;
+  const periodAppointments = filtered.filter(a => a.date >= periodStart && a.date <= periodEnd).sort(byTime);
+  const counts = countByStatus(periodAppointments);
+  const matching = periodAppointments.filter(a => matchesAgendaStatus(a, status, state.now));
+  const rescheduleIds = rescheduleRequestIds(state);
+  const professionals = agendaProfessionals(state, periodAppointments, professionalId, specialty);
+  const mobileSwitch = narrow && view === 'dia' && professionals.length > 1;
+  const mobileCurrent = Math.min(mobileIndex, Math.max(0, professionals.length - 1));
+  const gridProfessionals = mobileSwitch ? professionals.slice(mobileCurrent, mobileCurrent + 1) : professionals;
+  const freeSlots = new Map<string, string[]>();
+  for (const professional of professionals) for (const day of days) freeSlots.set(slotKey(professional.id, day), getFreeSlots(state, professional.id, day));
+  const freeCount = [...freeSlots.values()].reduce((sum, slots) => sum + slots.length, 0);
+  const ids = new Set(professionals.map(p => p.id));
+  const blocks = state.blocks.filter(b => ids.has(b.professionalId) && days.includes(b.date));
+  // `availability=1` (Início, conversation assistant) and the legacy `view=week&professional=`
+  // links of the free-slots assistant used to open the side panel: now they focus the first free slot.
+  const highlightId = saved ? saved.id ?? state.appointments.find(a => !saved.before.has(a.id))?.id ?? null : null;
+
+  // "Dia de um profissional" (≥768): a click selects in the side panel (`selected=ID`,
+  // so "back" works) instead of opening the modal; `appointment=ID` still opens it.
+  const focusMode = view === 'dia' && !!professionalId && !hasRange && !narrow && professionals.length === 1;
+  const focusProfessional = focusMode ? professionals[0] : undefined;
+  const selected = focusMode ? state.appointments.find(a => a.id === params.get('selected')) : undefined;
+
+  function href(changes: Record<string, string | null>) {
     const query = new URLSearchParams(params.toString());
-    query.delete('view');
     Object.entries(changes).forEach(([key, value]) => value ? query.set(key, value) : query.delete(key));
-    router.push(`/gestao/agenda?${query}`, { scroll: false });
+    return `/gestao/agenda?${query}`;
   }
-  function closeForm() { update({ new: null, edit: null, start: null }); }
+  function update(changes: Record<string, string | null>) { router.push(href(changes), { scroll: false }); }
+  const changeDate = (value: string) => update({ date: value, selected: null });
+  function closeSelection() {
+    const id = selected?.id; update({ selected: null });
+    if (id) requestAnimationFrame(() => document.querySelector<HTMLElement>(`.calendar-scroll [data-appointment-id="${id}"]`)?.focus());
+  }
+  const selectAppointment = (a: Appointment) => update(focusMode ? { selected: a.id } : { appointment: a.id });
+  function closeForm() { update({ new: null, edit: null, start: null, slotProfessional: null }); }
+  const weekHref = (id: string) => href({ professional: id, view: 'semana', from: null, to: null });
+  const dayHref = (day: string) => href({ date: day, professional: null, view: 'dia', from: null, to: null });
+  const backToAgenda = () => update({ from: null, to: null, date: periodStart, view: 'dia' });
+  const openSlot = (id: string, day: string, time: string) => update({ new: '1', start: time, date: day, slotProfessional: id === professionalId ? null : id, appointment: null, edit: null });
+  const professionalMenu = (professional: Professional): MenuItem[] => [
+    { label: 'Ver semana', icon: <CalendarRange size={16} />, onSelect: () => router.push(weekHref(professional.id), { scroll: false }) },
+    { label: 'Gerenciar disponibilidade', icon: <Clock3 size={16} />, onSelect: () => router.push(`/gestao/configuracoes?tab=availability&professional=${professional.id}`) },
+    { label: 'Bloquear horário', icon: <Lock size={16} />, onSelect: () => setBlockDraft({ professionalId: professional.id, date }) },
+  ];
+  function chooseView(next: 'dia' | 'semana') {
+    if (next === 'semana' && !professionalId) { setPickerOpen(true); return; }
+    update({ view: next });
+  }
+
+  const nonCancelled = (a: Appointment) => a.status !== 'cancelada';
+  const marked = new Set(state.appointments.filter(a => scoped(a) && (!professionalId || a.professionalId === professionalId) && matchesAgendaStatus(a, status, state.now)).map(a => a.date));
+  const blocksCount = blocks.length;
+  const stripNote = hasRange ? `${matching.length} ${matching.length === 1 ? 'consulta' : 'consultas'} no recorte`
+    : view === 'semana' ? `${freeCount} ${freeCount === 1 ? 'horário livre' : 'horários livres'} na semana · ${blocksCount} ${blocksCount === 1 ? 'bloqueio' : 'bloqueios'}`
+    : `${freeCount} ${freeCount === 1 ? 'horário livre' : 'horários livres'} · Recife (UTC−3)`;
+  const strip = <div className="status-strip">
+    <div className="status-chips" role="group" aria-label="Filtrar por situação">
+      <button type="button" className="status-chip" aria-pressed={!status} onClick={() => update({ status: null, planned: null })}>Todas <span className="chip-count tabular">{counts.todas}</span></button>
+      {statusChipOrder.map(value => <button type="button" key={value} className="status-chip" data-tone={appointmentStatusTones[value]} aria-pressed={status === value} onClick={() => update({ status: status === value ? null : value, planned: null })}>
+        <i className="status-dot" aria-hidden="true" />{statusChipLabels[value]} <span className="chip-count tabular">{counts[value]}</span>
+      </button>)}
+    </div>
+    <span className="status-strip-note">{stripNote}</span>
+    {focusMode && !docked && <Button variant="secondary" className="day-summary-trigger" aria-haspopup="dialog" onClick={() => setSummaryOpen(true)}><ListChecks size={16} />Resumo do dia</Button>}
+  </div>;
+  const switcher = mobileSwitch && <div className="mobile-pro-switch">
+    <Button variant="ghost" size="icon" aria-label="Profissional anterior" disabled={mobileCurrent === 0} onClick={() => setMobileIndex(mobileCurrent - 1)}><ChevronLeft size={18} /></Button>
+    <div className="mobile-pro-current" aria-live="polite"><ProfessionalAvatar professional={professionals[mobileCurrent]} size={26} /><span><strong>{professionals[mobileCurrent].name}</strong><small>{mobileCurrent + 1} de {professionals.length} profissionais</small></span></div>
+    <Button variant="ghost" size="icon" aria-label="Próximo profissional" disabled={mobileCurrent === professionals.length - 1} onClick={() => setMobileIndex(mobileCurrent + 1)}><ChevronRight size={18} /></Button>
+  </div>;
+  const panelProps = focusProfessional && {
+    state, professional: focusProfessional, date, appointments: periodAppointments.filter(a => a.professionalId === focusProfessional.id),
+    freeSlots: freeSlots.get(slotKey(focusProfessional.id, date)) ?? [], blocks: blocks.filter(b => b.professionalId === focusProfessional.id),
+    selected, rescheduleIds, context, weekHref: weekHref(focusProfessional.id),
+    marked: (day: string) => state.appointments.some(a => a.professionalId === focusProfessional.id && a.date === day),
+    onSelectDate: changeDate, onSelect: (a: Appointment) => { setSummaryOpen(false); update({ selected: a.id }); }, onCloseSelection: closeSelection,
+    onOpenDetails: (a: Appointment) => update({ appointment: a.id }), onReschedule: (a: Appointment) => update({ edit: a.id, selected: null }),
+    onSlot: (time: string) => { setSummaryOpen(false); openSlot(focusProfessional.id, date, time); },
+    onBlock: (block: Block) => router.push(`/gestao/configuracoes?tab=availability&professional=${block.professionalId}&block=${block.id}`),
+    onBlockTime: () => { setSummaryOpen(false); setBlockDraft({ professionalId: focusProfessional.id, date }); },
+  };
+  const aside = panelProps && docked ? <aside className="day-panel" aria-label="Painel do dia"><DayPanel {...panelProps} mode="both" /></aside> : undefined;
+  let content: ReactNode;
+  if (hasRange || (narrow && view === 'semana')) {
+    const groups = hasRange ? [...new Set(matching.map(a => a.date))] : days;
+    content = <section className="card schedule-calendar agenda-list-card" aria-label="Consultas">
+      {strip}
+      {groups.length ? <div className="agenda-day-groups">{groups.map(day => <AgendaDayTable key={day} state={state} date={day} rescheduleIds={rescheduleIds} appointments={matching.filter(a => a.date === day)} onOpen={a => update({ appointment: a.id })}
+        closed={!hasRange && isClinicClosed(state, day)} freeSlots={!hasRange && professionals[0] ? freeSlots.get(slotKey(professionals[0].id, day)) : undefined} onSlot={time => professionals[0] && openSlot(professionals[0].id, day, time)} />)}</div>
+        : <EmptyState title="Nenhuma consulta neste período"><Button variant="secondary" onClick={backToAgenda}>Voltar à agenda</Button></EmptyState>}
+    </section>;
+  } else {
+    content = <CalendarCard state={state} view={view} days={days} professionals={gridProfessionals} appointments={periodAppointments.filter(a => !mobileSwitch || a.professionalId === gridProfessionals[0]?.id)} status={status}
+      highlightId={highlightId} rescheduleIds={rescheduleIds} freeSlots={freeSlots} blocks={blocks} focusFirstFree={params.has('availability') || (params.get('view') === 'week' && !!professionalId)}
+      strip={<>{strip}{switcher}</>} weekHref={weekHref} dayHref={dayHref} professionalMenu={professionalMenu}
+      focus={focusMode} aside={aside} selectedId={selected?.id ?? detail?.id}
+      onSelectAppointment={selectAppointment} onSlot={openSlot} onBlock={block => router.push(`/gestao/configuracoes?tab=availability&professional=${block.professionalId}&block=${block.id}`)} />;
+  }
+
   return <div data-density="compact" className="page-stack agenda-page">
-    <PageHeading eyebrow="GESTÃO DA CLÍNICA" title="Agenda" description="Uma visão clara de cada horário, em cada dia." actions={<Button onClick={() => update({ new: '1', edit: null, appointment: null })}><Plus size={17} />Novo agendamento</Button>} />
+    <PageHeading trail={['Gestão', 'Agenda']} title="Agenda" actions={<>
+      {!hasRange && <div className="segmented agenda-view-switch" role="group" aria-label="Visualização">
+        <button type="button" aria-pressed={view === 'dia'} onClick={() => chooseView('dia')}>Dia</button>
+        <button type="button" aria-pressed={view === 'semana'} onClick={() => chooseView('semana')}>Semana</button>
+      </div>}
+      <Button data-density="standard" onClick={() => update({ new: '1', edit: null, appointment: null, start: null, slotProfessional: null })}><Plus size={16} />Novo agendamento</Button>
+    </>} />
     {context && <Link className="text-link" href={`/conversas?id=${encodeURIComponent(context)}`}><ArrowLeft size={16} />Voltar à conversa</Link>}
     {params.has('edit') && !editing && <div className="notice">{editRequested ? 'Consultas finalizadas ou canceladas mantêm seu histórico e não podem ser remarcadas.' : 'Consulta não encontrada.'}<Button variant="ghost" onClick={() => update({ edit: null, appointment: editRequested?.id ?? null })}>Ver agenda</Button></div>}
-    <div className="schedule-toolbar">
-      <div className="schedule-period"><span className="schedule-month">{formatDate(date, { month: 'long', year: 'numeric', day: undefined })}</span><h2>{hasRange ? formatPeriod({ start: periodStart, end: periodEnd }) : view === 'week' ? `${formatDate(days[0], { day: '2-digit', month: 'short' })} — ${formatDate(days[6], { day: '2-digit', month: 'short' })}` : formatDate(date, { weekday: 'long', day: 'numeric' })}</h2></div>
-      <div className="schedule-navigation"><Button variant="ghost" aria-label="Período anterior" onClick={() => update({ date: addDays(date, view === 'week' ? -7 : -1), from: null, to: null })}><ChevronLeft size={18} /></Button><Button variant="ghost" aria-label="Próximo período" onClick={() => update({ date: addDays(date, view === 'week' ? 7 : 1), from: null, to: null })}><ChevronRight size={18} /></Button><Button variant="secondary" onClick={() => update({ date: state.referenceDate, from: null, to: null })}>Hoje</Button></div>
-      <div className="schedule-controls"><DateInput label="Data da agenda" required value={date} onChange={value => update({ date: value, from: null, to: null })} /></div>
+    {hasRange && <div className="agenda-range-context"><h2>{rangeTitle(periodStart, periodEnd, status)}</h2><Button variant="secondary" onClick={backToAgenda}><ArrowLeft size={16} />Voltar à agenda</Button></div>}
+    <div className="agenda-controls" data-density="standard">
+      <div className="agenda-toolbar">
+        {!hasRange && <div className="agenda-nav">
+          <Button variant="secondary" onClick={() => changeDate(state.referenceDate)}>Hoje</Button>
+          <Button variant="ghost" size="icon" aria-label={view === 'semana' ? 'Semana anterior' : 'Dia anterior'} onClick={() => changeDate(shiftDate(date, view, -1))}><ChevronLeft size={18} /></Button>
+          <Button variant="ghost" size="icon" aria-label={view === 'semana' ? 'Próxima semana' : 'Próximo dia'} onClick={() => changeDate(shiftDate(date, view, 1))}><ChevronRight size={18} /></Button>
+          <DatePicker key={`${date}-${view}`} view={view} date={date} days={days} today={state.referenceDate} marked={day => marked.has(day)} onChange={changeDate} />
+        </div>}
+        <div className="agenda-scope">
+          <ProfessionalPicker state={state} professionalId={professionalId} open={pickerOpen} onOpenChange={setPickerOpen}
+            todayCount={id => state.appointments.filter(a => a.professionalId === id && a.date === state.referenceDate && nonCancelled(a)).length}
+            dayCount={state.appointments.filter(a => a.date === date && scoped(a) && nonCancelled(a)).length}
+            onSelect={id => update(hasRange ? { professional: id || null } : { professional: id || null, view: id ? 'semana' : 'dia' })}
+            onClear={() => update(hasRange ? { professional: null } : { professional: null, view: 'dia' })} />
+          <FiltersPopover state={state} patientId={patientId} specialty={specialty} onChange={update} />
+        </div>
+      </div>
+      <ActiveFilterChips state={state} patientId={patientId} specialty={specialty} status={status} onChange={update} />
     </div>
-    <div className="schedule-filters"><span className="schedule-filter-label"><Filter size={15} />Filtrar</span>
-      <select aria-label="Filtrar profissional" value={professionalId} onChange={e => update({ professional: e.target.value })}><option value="">Todos os profissionais</option>{state.professionals.map(p => <option key={p.id} value={p.id}>{p.name}{!p.active ? ' · inativo' : ''}</option>)}</select>
-      <select aria-label="Filtrar situação" value={status} onChange={e => update({ status: e.target.value, planned: null })}><option value="">Todas as situações</option>{Object.entries(appointmentStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}<option value="previstas">Previstas</option><option value="pendente">Sem resultado registrado</option></select>
-      <select aria-label="Filtrar paciente" value={patientId} onChange={e => update({ patient: e.target.value })}><option value="">Todos os pacientes</option>{state.patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-      <select aria-label="Filtrar especialidade da agenda" value={specialty} onChange={e => update({ specialty: e.target.value })}><option value="">Todas as especialidades</option>{state.clinic.specialties.map(item => <option key={item}>{item}</option>)}</select>
-      {(professionalId || status || patientId || specialty || hasRange) && <Button variant="ghost" onClick={() => update({ professional: null, status: null, planned: null, patient: null, specialty: null, from: null, to: null })}>Limpar</Button>}
-    </div>
-    <div className="schedule-layout"><section className="schedule-calendar card">
-      <div className="schedule-caption"><span><span className="live-dot" />{professionalId ? state.professionals.find(p => p.id === professionalId)?.name : 'Dia por profissional'}</span><span>{appointments.length} consultas · America/Recife</span></div>
-      {!hasRange ? <CalendarGrid state={state} days={days} professionals={calendarProfessionals} byProfessional={!professionalId} onSelectProfessional={id => update({ professional: id, from: null, to: null })} selectedDate={date} appointments={appointments} onSelectDate={value => update({ date: value })} onSelectAppointment={appointment => update({ appointment: appointment.id })} /> : appointments.length ? <div className="schedule-range-list">{appointments.map(a => <button key={a.id} className={`schedule-list-event status-${a.status}`} data-appointment-id={a.id} onClick={() => update({ appointment: a.id })}><span className="range-date">{formatDate(a.date)}<strong>{a.start}–{appointmentEnd(a)}</strong></span><span><strong>{state.patients.find(p => p.id === a.patientId)?.name}</strong><small>{state.professionals.find(p => p.id === a.professionalId)?.name}</small>{cancellationReason(a) && <span className="range-cancel-note" title={a.cancelReason}><MessageSquareText size={13} />Motivo nos detalhes</span>}</span><span className="event-status"><i />{appointmentStatusLabels[a.status]}</span><ArrowUpRight size={15} /></button>)}</div> : <EmptyState title="Nenhuma consulta neste recorte" description="Altere o período ou os filtros para consultar a agenda." />}
-    </section><aside className="schedule-sidebar">
-      <section className="card availability-panel"><div className="panel-title"><span className="icon-tile"><Clock3 size={18} /></span><div><h2>Disponibilidade</h2><p>{formatDate(date, { weekday: 'short', day: 'numeric', month: 'short' })} · horários de 30 min</p></div></div><div className="panel-professionals">{shownProfessionals.map((p, index) => {
-        const slots = getFreeSlots(state, p.id, date); const availability = getAvailability(state, p.id, date); const expanded = expandedSlots.includes(p.id);
-        return <details className="panel-professional" key={`${p.id}-${professionalId ? 'selected' : 'all'}`} open={!!professionalId || index === 0}><summary><span><strong>{p.name}</strong><small>{p.specialties.join(' · ')}</small></span><ChevronRight size={14} /></summary><p>{availability.length ? availability.map(slot => `${slot.start}–${slot.end}`).join(' · ') : 'Sem expediente neste dia'}</p><div className="availability-grid">{(expanded ? slots : slots.slice(0, 4)).map(slot => <button type="button" key={slot} className="availability-chip" aria-label={`Agendar com ${p.name} às ${slot}`} onClick={() => update({ new: '1', professional: p.id, start: slot, appointment: null })}>{slot}</button>)}</div>{slots.length > 4 && <button className="show-slots" onClick={() => setExpandedSlots(ids => expanded ? ids.filter(id => id !== p.id) : [...ids, p.id])}>{expanded ? 'Mostrar menos' : `Ver mais ${slots.length - 4} horários`}</button>}{availability.length > 0 && !slots.length && <p className="panel-empty">Sem horários livres futuros.</p>}</details>;
-      })}{!shownProfessionals.length && <p className="panel-empty">Nenhum profissional ativo neste filtro.</p>}</div><Link className="panel-link" href={`/gestao/configuracoes?tab=availability${professionalId ? `&professional=${professionalId}` : ''}`}>Gerenciar disponibilidade<ArrowUpRight size={15} /></Link></section>
-      <section className="card blocks-panel"><div className="panel-title"><span className="icon-tile"><CalendarOff size={18} /></span><div><h2>{professionalId ? 'Bloqueios da semana' : 'Bloqueios do dia'}</h2><p>{professionalId ? formatPeriod({ start: blocksStart, end: blocksEnd }) : formatDate(date, { day: 'numeric', month: 'long' })}</p></div></div>{blocks.length ? <div className="panel-blocks">{blocks.map(block => <Link className="panel-block" data-block-id={block.id} key={block.id} href={`/gestao/configuracoes?tab=availability&professional=${block.professionalId}&block=${block.id}`}><strong>{block.start}–{block.end}<ArrowUpRight size={13} /></strong><p>{block.reason}</p><small>{professionalId ? formatDate(block.date, { weekday: 'short', day: 'numeric', month: 'short' }) : state.professionals.find(p => p.id === block.professionalId)?.name}</small></Link>)}</div> : <div className="panel-no-blocks"><span><CalendarDays size={23} /></span><p>{professionalId ? 'Nenhum bloqueio nesta semana.' : 'Nenhum bloqueio neste dia.'}</p><small>O expediente segue os horários da clínica.</small></div>}<Link className="panel-link" href={`/gestao/configuracoes?tab=availability${professionalId ? `&professional=${professionalId}` : ''}`}>Gerenciar bloqueios<ArrowUpRight size={15} /></Link></section>
-    </aside></div>
-    {(params.get('new') === '1' || editing) && <AppointmentForm key={editing?.id ?? `${date}-${professionalId}-${params.get('start')}`} appointment={editing} patientId={patientId} professionalId={professionalId} initialDate={date} initialStart={params.get('start') ?? undefined} onClose={closeForm} />}
+    {content}
+    {(params.get('new') === '1' || editing) && <AppointmentForm key={editing?.id ?? `${date}-${professionalId}-${params.get('slotProfessional')}-${params.get('start')}`} appointment={editing} patientId={patientId} professionalId={params.get('slotProfessional') || professionalId} initialDate={date} initialStart={params.get('start') ?? undefined} onClose={closeForm} onSaved={() => setSaved({ id: editing?.id, before: new Set(state.appointments.map(a => a.id)) })} />}
     {detail && !editing && params.get('new') !== '1' && <AppointmentDetails key={detail.id} appointment={detail} onClose={() => update({ appointment: null })} onReschedule={() => update({ appointment: null, edit: detail.id })} />}
+    {panelProps && !docked && selected && !detail && !editing && <Drawer label={`Consulta de ${state.patients.find(p => p.id === selected.patientId)?.name ?? 'paciente'}`} side="right" className="day-panel-drawer" onClose={closeSelection}><DayPanel {...panelProps} mode="selection" /></Drawer>}
+    {panelProps && !docked && summaryOpen && !selected && <Drawer label="Resumo do dia" side="right" className="day-panel-drawer" onClose={() => setSummaryOpen(false)}>
+      <div className="drawer-close"><Button variant="ghost" size="icon" aria-label="Fechar resumo" onClick={() => setSummaryOpen(false)}><ChevronRight size={18} /></Button></div>
+      <DayPanel {...panelProps} mode="summary" />
+    </Drawer>}
+    {blockDraft && <BlockForm professionalId={blockDraft.professionalId} initialDate={blockDraft.date} onClose={() => setBlockDraft(null)} />}
   </div>;
 }

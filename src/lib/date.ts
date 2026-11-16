@@ -50,3 +50,30 @@ export function formatPeriod(period: Period): string {
   if (period.start === period.end) return formatDate(period.start, { year: 'numeric' });
   return `${formatDate(period.start)} – ${formatDate(period.end, { year: 'numeric' })}`;
 }
+
+const shortMonths = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+/** Calendar date (YYYY-MM-DD) of an ISO instant in the clinic timezone. */
+export function clinicDate(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: CLINIC_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value));
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+/** Whole calendar days from `from` to `to` (both YYYY-MM-DD). */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+}
+/** "hoje", "ontem", "há 12 dias", "há 1 mês", "há 3 meses", "há 1 ano" for a past date. */
+export function relativeAgo(date: string, referenceDate: string): string {
+  const days = daysBetween(date, referenceDate);
+  if (days <= 0) return 'hoje';
+  if (days === 1) return 'ontem';
+  if (days < 30) return `há ${days} dias`;
+  if (days < 365) { const months = Math.floor(days / 30); return `há ${months} ${months === 1 ? 'mês' : 'meses'}`; }
+  const years = Math.floor(days / 365);
+  return `há ${years} ${years === 1 ? 'ano' : 'anos'}`;
+}
+/** "29 out." */
+export const dayMonth = (date: string) => `${Number(date.slice(8, 10))} ${shortMonths[Number(date.slice(5, 7)) - 1]}`;
+/** "set. 2026" */
+export const monthYearShort = (date: string) => `${shortMonths[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;

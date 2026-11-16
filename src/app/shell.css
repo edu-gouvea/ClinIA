@@ -1,0 +1,328 @@
+/* App shell: sidebar + content canvas.
+ * Breakpoints come from src/lib/breakpoints.ts (sm 640 · md 768 · lg 1024 · xl 1280 · 2xl 1536);
+ * tests/breakpoints.test.ts keeps the literal values below in sync. */
+.app-frame {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+/* Brand */
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+}
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--green);
+  color: var(--on-green);
+  flex-shrink: 0;
+}
+.brand-wordmark {
+  font-size: 19px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.brand-dot { color: var(--green); }
+
+/* Sidebar */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 240px;
+  flex: none;
+  padding: var(--space-4) var(--space-3);
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+/* The rail is fixed to the viewport on every page: it never scrolls, neither with the
+ * page nor on its own. Short windows tighten its vertical rhythm instead (see below). */
+.sidebar:not(.sidebar-drawer) {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100dvh;
+  overflow: hidden;
+}
+.sidebar-clinic {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding-inline: var(--space-1);
+  font: var(--type-body);
+  font-weight: 500;
+  color: var(--ink);
+}
+.sidebar-clinic-mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: var(--radius-xs);
+  background: var(--mint);
+  color: var(--green-ink);
+  font: var(--type-caption);
+  font-weight: 600;
+}
+.sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.sidebar-group-label {
+  padding-inline: var(--space-2);
+  font: var(--type-caption);
+  font-weight: 500;
+  color: var(--subtle);
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: var(--type-body);
+  text-align: left;
+}
+.sidebar-item:hover { background: var(--surface-hover); color: var(--ink); }
+.sidebar-item.active,
+.sidebar-item[aria-current="page"] {
+  background: var(--surface-selected);
+  color: var(--ink);
+  font-weight: 500;
+}
+.sidebar-item > svg { flex: none; }
+.sidebar-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-item > .sidebar-label { flex: 1; }
+.nav-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding-inline: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--green);
+  color: var(--on-green);
+  font: var(--type-caption);
+  font-weight: 600;
+}
+.sidebar-assistant > svg { color: var(--ai); }
+.sidebar-spacer { flex: 1; }
+
+/* Theme switch inside the sidebar item */
+.theme-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  transition: background var(--transition);
+}
+.theme-switch > span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: transform var(--transition);
+}
+.theme-toggle[aria-pressed="true"] .theme-switch { background: var(--green); }
+.theme-toggle[aria-pressed="true"] .theme-switch > span { transform: translateX(12px); background: var(--on-green); }
+
+/* Demo notice */
+.sidebar-demo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  font: var(--type-caption);
+  color: var(--subtle);
+}
+.sidebar-demo-icon { display: none; color: var(--muted); }
+.sidebar-demo p { display: flex; flex-direction: column; white-space: normal; }
+.sidebar-demo strong { font-weight: 500; color: var(--muted); }
+
+/* Profile */
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+.sidebar-profile:hover { background: var(--surface-hover); }
+.sidebar-profile .avatar { width: 28px; height: 28px; }
+.sidebar-profile .sidebar-label { display: flex; flex-direction: column; }
+.sidebar-profile strong { font: var(--type-body-sm); font-weight: 500; }
+.sidebar-profile small { font: var(--type-caption); color: var(--subtle); }
+
+/* Content canvas */
+.app-main {
+  flex: 1;
+  min-width: 0;
+  background: var(--canvas);
+  padding: var(--space-8) var(--space-10) 56px;
+}
+.app-container {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+.app-container > .error-banner { margin-top: 0; }
+/* Visão gerencial: white cards over the grey chrome background, wider container. */
+.app-main.app-main-analysis { background: var(--bg); }
+.app-main-analysis > .app-container { max-width: 1280px; }
+
+/* Conversations fill the viewport; panels scroll internally. The JS in
+ * features/conversations.tsx sets --conversation-viewport-height on .app-main. */
+.app-main-conversations {
+  --conversation-shell-header: 0px;
+  display: flex;
+  flex-direction: column;
+  height: calc(var(--conversation-viewport-height, 100dvh) - var(--conversation-shell-header));
+  min-height: 0;
+}
+/* Full-height workspace: no page padding, no max-width container. */
+.app-main.app-main-conversations { padding: 0; }
+.app-main-conversations > .app-container { max-width: none; }
+.app-main-conversations > .app-container,
+.app-main-conversations .app-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Short windows: compress spacing so every item still fits without a scrollbar. */
+@media (max-height: 760px) {
+  .sidebar:not(.sidebar-drawer) { gap: var(--space-3); padding-block: var(--space-3); }
+  .sidebar:not(.sidebar-drawer) .sidebar-item { min-height: 30px; }
+}
+@media (max-height: 620px) {
+  .sidebar:not(.sidebar-drawer) { gap: var(--space-2); padding-block: var(--space-2); }
+  .sidebar:not(.sidebar-drawer) .sidebar-item { min-height: 28px; }
+}
+
+/* Mobile bar + drawer */
+.mobile-bar { display: none; }
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--overlay);
+  animation: appear .15s;
+}
+.drawer {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: flex;
+  flex-direction: column;
+  width: min(280px, calc(100% - 48px));
+  overflow-y: auto;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  box-shadow: var(--shadow-dialog);
+}
+.drawer-close { position: absolute; top: var(--space-3); right: var(--space-2); z-index: 1; }
+.sidebar.sidebar-drawer { display: flex; width: 100%; flex: 1; border-right: 0; }
+
+/* 768–1279: collapsed icon rail */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .sidebar:not(.sidebar-drawer) {
+    width: 56px;
+    align-items: center;
+    padding-inline: var(--space-2);
+  }
+  .sidebar:not(.sidebar-drawer) .sidebar-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .sidebar:not(.sidebar-drawer) .brand-wordmark { display: none; }
+  .sidebar:not(.sidebar-drawer) .sidebar-logo,
+  .sidebar:not(.sidebar-drawer) .sidebar-clinic { padding: 0; justify-content: center; }
+  .sidebar:not(.sidebar-drawer) .sidebar-item { position: relative; justify-content: center; width: 40px; padding: 0; }
+  .sidebar:not(.sidebar-drawer) .sidebar-group-label { width: 24px; height: 1px; margin: 0 auto var(--space-1); padding: 0; background: var(--border); }
+  .sidebar:not(.sidebar-drawer) .nav-count { position: absolute; top: 0; right: -2px; min-width: 16px; height: 16px; padding-inline: 4px; }
+  .sidebar:not(.sidebar-drawer) .theme-switch { display: none; }
+  .sidebar:not(.sidebar-drawer) .sidebar-demo { justify-content: center; width: 40px; padding: var(--space-2) 0; }
+  .sidebar:not(.sidebar-drawer) .sidebar-demo-icon { display: block; }
+  .sidebar:not(.sidebar-drawer) .sidebar-profile { justify-content: center; width: 40px; }
+  .app-main { padding: var(--space-8) var(--space-8) var(--space-12); }
+}
+
+/* Conversas and Visão gerencial keep the icon rail at every width ≥768 so the workspace
+ * gets the room (same rules as above, scoped by `.app-frame-rail`). */
+@media (min-width: 1280px) {
+  .app-frame-rail .sidebar:not(.sidebar-drawer) {
+    width: 56px;
+    align-items: center;
+    padding-inline: var(--space-2);
+  }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .sidebar-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .brand-wordmark { display: none; }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .sidebar-logo,
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .sidebar-clinic { padding: 0; justify-content: center; }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .sidebar-item { position: relative; justify-content: center; width: 40px; padding: 0; }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .sidebar-group-label { width: 24px; height: 1px; margin: 0 auto var(--space-1); padding: 0; background: var(--border); }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .nav-count { position: absolute; top: 0; right: -2px; min-width: 16px; height: 16px; padding-inline: 4px; }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .theme-switch { display: none; }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .sidebar-demo { justify-content: center; width: 40px; padding: var(--space-2) 0; }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .sidebar-demo-icon { display: block; }
+  .app-frame-rail .sidebar:not(.sidebar-drawer) .sidebar-profile { justify-content: center; width: 40px; }
+}
+
+/* <768: top bar + drawer */
+@media (max-width: 767px) {
+  .app-frame { flex-direction: column; }
+  .sidebar:not(.sidebar-drawer) { display: none; }
+  .mobile-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    height: 52px;
+    flex: none;
+    padding: 0 var(--space-2) 0 var(--space-3);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .mobile-bar-actions { display: flex; align-items: center; gap: var(--space-1); }
+  .mobile-assistant svg { color: var(--ai); }
+  .app-main { padding: var(--space-5) var(--space-4) var(--space-10); }
+  /* In the column layout flex-grow would override the fixed height. */
+  .app-main-conversations { --conversation-shell-header: 52px; flex: none; }
+}

@@ -29,23 +29,29 @@ test('assumir conversa → consultar paciente → remarcar → conferir agenda, 
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await ready(page, '/conversas?id=conversation-1');
-  await expect(page.getByLabel('Mensagem para o paciente')).toBeDisabled();
+  await expect(page.getByLabel('Mensagem para Ana Beatriz Santos')).toHaveCount(0);
   await page.getByRole('button', { name: 'Assumir conversa', exact: true }).click();
-  await expect(page.getByLabel('Mensagem para o paciente')).toBeEnabled();
-  await page.getByLabel('Mensagem para o paciente').fill('Olá, Ana! Vou ajudar com a remarcação.');
+  await expect(page.getByLabel('Mensagem para Ana Beatriz Santos')).toBeEnabled();
+  await page.getByLabel('Mensagem para Ana Beatriz Santos').fill('Olá, Ana! Vou ajudar com a remarcação.');
   await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click();
   await expect(page.getByRole('log')).toContainText('Olá, Ana! Vou ajudar com a remarcação.');
   await page.getByRole('link', { name: 'Ver cadastro', exact: true }).click();
   await expect(page).toHaveURL(/gestao\/pacientes\?id=patient-1&context=conversation-1/);
   await expect(page.getByRole('heading', { name: 'Ana Beatriz Santos', level: 1 })).toBeVisible();
-  await page.locator('a[href*="edit=appt-ana"]').click();
+  // The reschedule entry point is now the pending-request notice ("Pediu remarcação")
+  // at the top of the record; it keeps the same Agenda edit link.
+  const remarcar = page.locator('[data-pendency="remarcacao"]').getByRole('link', { name: 'Remarcar', exact: true });
+  await expect(remarcar).toHaveAttribute('href', /edit=appt-ana.*context=conversation-1/);
+  await remarcar.click();
   const dialog = page.getByRole('dialog', { name: 'Remarcar consulta', exact: true });
   await expect(dialog).toBeVisible();
   const targetDate = '2026-11-10';
   const targetStart = getFreeSlots(seed, 'pro-clara', targetDate).find(slot => !seed.appointments.some(a => a.patientId === 'patient-1' && a.date === targetDate && a.status !== 'cancelada' && minutes(slot) < minutes(a.start) + a.duration && minutes(slot) + 30 > minutes(a.start)))!;
   expect(targetStart).toBeTruthy();
-  await dialog.getByLabel('Data', { exact: true }).fill(targetDate);
-  await dialog.getByLabel('Horário de início', { exact: true }).fill(targetStart);
+  // Date and time are now picked in the month and free-times columns.
+  await dialog.locator(`[data-date="${targetDate}"]`).click();
+  await dialog.getByRole('option', { name: targetStart, exact: true }).click();
+  await expect(dialog.getByRole('option', { name: targetStart, exact: true })).toHaveAttribute('aria-selected', 'true');
   await dialog.getByRole('button', { name: 'Salvar remarcação' }).click();
   await expect(dialog).toHaveCount(0);
   const saved = await snapshot(page);
@@ -62,9 +68,9 @@ test('assumir conversa → consultar paciente → remarcar → conferir agenda, 
   const expected = getMetrics(saved, getPeriod(saved.referenceDate, 7));
   const before = getMetrics(seed, getPeriod(seed.referenceDate, 7));
   expect(expected.planned).toBe(before.planned - 1);
-  await expect(page.locator('.metric-card').filter({ hasText: 'Consultas previstas' }).locator('.metric-value')).toHaveText(String(expected.planned));
+  await expect(page.locator('.metric-card').filter({ hasText: 'Em aberto' }).locator('.metric-value')).toHaveText(String(expected.planned));
   await page.reload();
-  await expect(page.locator('.metric-card').filter({ hasText: 'Consultas previstas' }).locator('.metric-value')).toHaveText(String(expected.planned));
+  await expect(page.locator('.metric-card').filter({ hasText: 'Em aberto' }).locator('.metric-value')).toHaveText(String(expected.planned));
   expect((await snapshot(page)).appointments.find(a => a.id === 'appt-ana')?.date).toBe(targetDate);
   expect(errors).toEqual([]);
 });
@@ -72,14 +78,16 @@ test('assumir conversa → consultar paciente → remarcar → conferir agenda, 
 test('falha de mensagem, nova tentativa sem duplicação e sessões preservadas', async ({ page }) => {
   await ready(page, '/conversas?id=conversation-1');
   await page.getByRole('button', { name: 'Assumir conversa', exact: true }).click();
-  await expect(page.getByLabel('Mensagem para o paciente')).toBeEnabled();
-  await page.getByRole('button', { name: 'Simular mensagem recebida', exact: true }).click();
+  await expect(page.getByLabel('Mensagem para Ana Beatriz Santos')).toBeEnabled();
+  // The simulator lives in the ⋯ menu ("Ferramentas da demonstração").
+  await page.getByRole('button', { name: 'Mais ações', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Simular mensagem recebida', exact: true }).click();
   const simulator = page.getByRole('dialog', { name: 'Simular mensagem recebida', exact: true });
   await simulator.getByRole('checkbox').check();
   await simulator.getByRole('button', { name: 'Receber mensagem', exact: true }).click();
   await expect(simulator).toHaveCount(0);
   const message = 'Mensagem E2E com falha e nova tentativa.';
-  await page.getByLabel('Mensagem para o paciente').fill(message);
+  await page.getByLabel('Mensagem para Ana Beatriz Santos').fill(message);
   await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click();
   await expect(page.getByRole('log')).toContainText('Falha no envio');
   await page.getByRole('button', { name: 'Tentar novamente', exact: true }).click();
@@ -91,8 +99,11 @@ test('falha de mensagem, nova tentativa sem duplicação e sessões preservadas'
   await page.getByRole('button', { name: 'Encerrar', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Encerrar atendimento', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByLabel('Mensagem para o paciente')).toBeDisabled();
-  await page.getByRole('button', { name: 'Simular mensagem recebida', exact: true }).click();
+  // Closed: the composer gives way to the "Encerrada …" notice.
+  await expect(page.getByLabel('Mensagem para Ana Beatriz Santos')).toHaveCount(0);
+  await expect(page.locator('.composer-notice')).toContainText('Se o paciente escrever de novo, uma nova sessão é aberta.');
+  await page.getByRole('button', { name: 'Mais ações', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Simular mensagem recebida', exact: true }).click();
   await simulator.getByLabel('Mensagem do paciente').fill('Olá, preciso de uma nova informação administrativa.');
   await simulator.getByRole('button', { name: 'Receber mensagem', exact: true }).click();
   await expect(simulator).toHaveCount(0);
@@ -113,17 +124,20 @@ test('rotas diretas, abas de gestão, filtros e voltar do navegador', async ({ p
     await ready(page, url);
     await expect(page.locator('h1')).toContainText(heading);
   }
-  await page.getByRole('navigation', { name: 'Áreas de gestão' }).getByRole('link', { name: 'Pacientes', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', { name: 'Pacientes', exact: true }).click();
   await expect(page).toHaveURL(/\/gestao\/pacientes$/);
-  await page.getByLabel('Buscar paciente por nome ou telefone').fill('Ana Beatriz');
+  await page.getByLabel('Buscar paciente', { exact: true }).fill('Ana Beatriz');
   await expect(page.locator('tbody tr')).toHaveCount(1);
-  await page.getByRole('link', { name: 'Ana Beatriz Santos', exact: true }).click();
+  // The whole row is one link named "Abrir cadastro de …".
+  await page.getByRole('link', { name: 'Abrir cadastro de Ana Beatriz Santos', exact: true }).click();
   await expect(page.locator('h1')).toHaveText('Ana Beatriz Santos');
   await page.goBack();
-  await expect(page.getByLabel('Buscar paciente por nome ou telefone')).toHaveValue('Ana Beatriz');
+  await expect(page.getByLabel('Buscar paciente', { exact: true })).toHaveValue('Ana Beatriz');
   await ready(page, '/inicio?period=7');
-  await page.locator('.metric-card').filter({ hasText: 'Consultas previstas' }).click();
-  await expect(page.getByLabel('Filtrar situação')).toHaveValue('previstas');
+  await page.locator('.metric-card').filter({ hasText: 'Em aberto' }).click();
+  // The legacy status has no chip of its own: it is shown as a removable filter.
+  await expect(page.getByRole('group', { name: 'Filtros aplicados' })).toContainText('Situação: Previstas');
+  await expect(page.getByRole('group', { name: 'Filtrar por situação' }).locator('[aria-pressed="true"]')).toHaveCount(0);
   await ready(page, '/conversas?reason=remarcacao');
   const count = seed.conversations.filter(c => c.status !== 'encerrada' && /remarc/i.test(c.reason || '')).length;
   await expect(page.locator('.conversation-list-item')).toHaveCount(count);
@@ -168,18 +182,21 @@ test('cadastro persiste, falha recuperável mantém formulário e restauração 
   await ready(page, '/gestao/configuracoes');
   await page.getByText('Ferramentas da demonstração', { exact: true }).click();
   await page.getByRole('button', { name: 'Testar falha de salvamento' }).click();
-  await page.getByRole('navigation', { name: 'Áreas de gestão' }).getByRole('link', { name: 'Pacientes', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', { name: 'Pacientes', exact: true }).click();
   await page.getByRole('button', { name: 'Cadastrar paciente', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Cadastrar paciente', exact: true });
   await dialog.getByLabel('Nome completo', { exact: true }).fill('Pessoa Fictícia E2E');
   await dialog.getByLabel('Telefone', { exact: true }).fill('(81) 99999-9999');
-  await dialog.getByRole('button', { name: 'Salvar paciente' }).click();
+  // The submit button now repeats the dialog's action: "Cadastrar paciente".
+  await dialog.getByRole('button', { name: 'Cadastrar paciente', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Falha simulada');
   await expect(dialog.getByLabel('Nome completo', { exact: true })).toHaveValue('Pessoa Fictícia E2E');
-  await dialog.getByRole('button', { name: 'Salvar paciente' }).click();
+  await dialog.getByRole('button', { name: 'Cadastrar paciente', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('link', { name: 'Pessoa Fictícia E2E', exact: true })).toBeVisible();
+  // Without an upcoming appointment the new record sorts last (page 2): search for it.
+  await page.getByLabel('Buscar paciente', { exact: true }).fill('Pessoa Fictícia');
+  await expect(page.getByRole('link', { name: 'Abrir cadastro de Pessoa Fictícia E2E', exact: true })).toBeVisible();
   await ready(page, '/gestao/configuracoes');
   await page.getByText('Ferramentas da demonstração', { exact: true }).click();
   await page.getByRole('button', { name: 'Restaurar demonstração', exact: true }).click();

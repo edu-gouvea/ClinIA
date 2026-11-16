@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, startTransition, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, startTransition, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createDemoState } from '@/lib/demo-data';
 import { runCommand } from '@/lib/services';
 import { isDemoState } from '@/lib/state-validation';
@@ -8,11 +8,16 @@ import type { Command, DemoState } from '@/lib/types';
 
 export const DEMO_STORAGE_KEY = 'clinia.demo.v1';
 type DemoContextValue = { state: DemoState; ready: boolean; error: string | null; act: (command: Command) => Promise<void>; reset: () => Promise<void> };
-const DemoContext = createContext<DemoContextValue | null>(null);
+// Holds the live value plus the value the server rendered. Stored data can load
+// before a nested Suspense boundary finishes hydrating; consumers then hydrate with
+// the server value (matching the HTML) and re-render with live data right after.
+const DemoContext = createContext<{ live: DemoContextValue; server: DemoContextValue } | null>(null);
+const noopSubscribe = () => () => {};
 
 export function DemoProvider({ children }: { children: ReactNode }) {
   // A stable initial value is never presented as loaded data. Browser storage is read after hydration.
-  const [state, setState] = useState<DemoState>(() => createDemoState('2026-11-09'));
+  const [initialState] = useState<DemoState>(() => createDemoState('2026-11-09'));
+  const [state, setState] = useState<DemoState>(initialState);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const current = useRef(state);
@@ -20,7 +25,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    const timeout = setTimeout(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    // Swapping the seed for stored data changes the context. A Suspense boundary
+    // whose HTML is still streaming (common in `next dev`) would then be
+    // client-rendered and the late server segment left behind as a hidden
+    // duplicate. Wait until the document has fully arrived before loading.
+    const load = () => { timeout = setTimeout(() => {
       if (!mounted) return;
       // Let streamed routes finish hydrating before replacing the initial shell.
       startTransition(() => {
@@ -39,8 +49,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setState(initial);
         setReady(true);
       });
-    }, 80);
-    return () => { mounted = false; clearTimeout(timeout); };
+    }, 80); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load, { once: true });
+    else load();
+    return () => { mounted = false; clearTimeout(timeout); document.removeEventListener('DOMContentLoaded', load); };
   }, []);
 
   const persist = useCallback((next: DemoState) => {
@@ -73,11 +85,15 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     return result;
   }, [persist]);
 
-  return <DemoContext.Provider value={{ state, ready, error, act, reset }}>{children}</DemoContext.Provider>;
+  const server = useMemo(() => ({ state: initialState, ready: false, error: null, act, reset }), [initialState, act, reset]);
+  const value = useMemo(() => ({ live: { state, ready, error, act, reset }, server }), [state, ready, error, act, reset, server]);
+  return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
 }
 
 export function useDemo(): DemoContextValue {
   const value = useContext(DemoContext);
+  // false only while this component hydrates (React uses the server snapshot).
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
   if (!value) throw new Error('useDemo deve ser usado dentro de DemoProvider.');
-  return value;
+  return hydrated ? value.live : value.server;
 }

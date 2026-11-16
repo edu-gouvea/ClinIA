@@ -17,3 +17,9 @@ test('missing denominators never imply an upward trend; a zero rate remains comp
   assert.deepEqual(metricComparison(10, 0), { text: 'Sem base de comparação', direction: 'none', tone: 'neutral' });
   assert.deepEqual(metricComparison(2, 0, true, 'lower'), { text: '+2,0 p.p. no período', direction: 'up', tone: 'negative' });
 });
+
+test('contagens comparam por diferença absoluta (D3); taxas seguem em p.p.', () => {
+  assert.deepEqual(metricComparison(12, 10, false, 'higher'), { text: '+2 no período', direction: 'up', tone: 'positive' });
+  assert.deepEqual(metricComparison(8, 10, false, 'higher'), { text: '-2 no período', direction: 'down', tone: 'negative' });
+  assert.deepEqual(metricComparison(10, 10, false, 'higher'), { text: 'Sem variação', direction: 'flat', tone: 'neutral' });
+});

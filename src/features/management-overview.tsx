@@ -2,44 +2,54 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { ReactNode } from 'react';
-import { ArrowDown, ArrowDownRight, ArrowUp, ArrowUpRight, ArrowUpDown } from 'lucide-react';
-import { Badge, Button, PageHeading } from '@/components/ui';
+import { useRef, type KeyboardEvent } from 'react';
+import { ArrowDown, ArrowRight, ArrowUp, Calendar, Check, ChevronDown, ChevronRight, Clock, Info, Plus, X } from 'lucide-react';
+import { Badge, Button, EmptyState, Menu, PageHeading, Popover } from '@/components/ui';
+import { KpiStrip, type KpiItem } from '@/components/kpi-strip';
+import { StackedBarChart } from '@/components/stacked-bar-chart';
 import { formatPeriod } from '@/lib/date';
-import { metricComparison } from '@/lib/metric-comparison';
-import { managementSorts, professionalMetrics, type ManagementSort } from '@/lib/management-presentation';
+import { countDelta, formatCountDelta, metricComparison, signedCountDelta } from '@/lib/metric-comparison';
+import { managementSorts, type ManagementSort } from '@/lib/management-presentation';
+import { outcomeBreakdown, previousDailyTotals, professionalActivity, resolveSort, type ActivityRow } from '@/lib/management-analysis';
 import type { DemoState, Metrics, Period } from '@/lib/types';
+import { ProfessionalAvatar } from './agenda/professional-avatar';
+import { chartSeries, dailyChartData, shortPeriod } from './home-operations';
 
 const ratio = (value: number | null) => value === null ? 'Sem dados' : `${value.toFixed(1).replace('.', ',')}%`;
-const hours = (value: number) => `${(value / 60).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h`;
-const columns: { key: ManagementSort; label: string }[] = [
-  { key: 'name', label: 'Profissional' }, { key: 'planned', label: 'Previstas' }, { key: 'completed', label: 'Realizadas' },
-  { key: 'availableMinutes', label: 'Disponibilidade' }, { key: 'occupancy', label: 'Ocupação' },
-  { key: 'cancelled', label: 'Canceladas' }, { key: 'missed', label: 'Faltas' }, { key: 'absenceRate', label: 'Taxa de faltas' },
+const decimal = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+const plural = (count: number, one: string, many: string) => `${count.toLocaleString('pt-BR')} ${count === 1 ? one : many}`;
+const periodOptions = [{ value: 1, label: 'Hoje' }, { value: 7, label: 'Últimos 7 dias' }, { value: 30, label: 'Últimos 30 dias' }];
+const weekdaysShort = ['dom.', 'seg.', 'ter.', 'qua.', 'qui.', 'sex.', 'sáb.'];
+const months = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+/** "seg., 02 nov." */
+const dayDetail = (date: string) => `${weekdaysShort[new Date(`${date}T12:00:00Z`).getUTCDay()]}, ${date.slice(8, 10)} ${months[Number(date.slice(5, 7)) - 1]}`;
+type Preference = 'higher' | 'lower' | 'neutral';
+const deltaTone = (current: number, previous: number, preference: Preference) => metricComparison(current, previous, false, preference).tone;
+
+const columns: { key: ManagementSort; label: string; numeric: boolean }[] = [
+  { key: 'name', label: 'Profissional', numeric: false }, { key: 'completed', label: 'Realizadas', numeric: true },
+  { key: 'occupancy', label: 'Ocupação da agenda', numeric: false }, { key: 'missed', label: 'Faltas', numeric: true },
+  { key: 'cancelled', label: 'Canceladas', numeric: true }, { key: 'planned', label: 'Em aberto', numeric: true },
 ];
 
-function Change({ current, previous, rate = false, preference = 'neutral' }: { current: number | null; previous: number | null; rate?: boolean; preference?: 'higher' | 'lower' | 'neutral' }) {
-  const change = metricComparison(current, previous, rate, preference);
-  return <span className="management-change" data-tone={change.tone}>
-    {change.direction === 'up' ? <ArrowUpRight size={13} aria-hidden="true" /> : change.direction === 'down' ? <ArrowDownRight size={13} aria-hidden="true" /> : null}
-    {change.text}<span className="sr-only">{change.tone === 'positive' ? ' · Variação favorável' : change.tone === 'negative' ? ' · Variação desfavorável' : ''}</span>
-  </span>;
-}
-
-function Occupancy({ value }: { value: number | null }) {
-  return <div className="management-occupancy"><span>{ratio(value)}</span>{value !== null && <span className="management-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></span>}</div>;
-}
-
-export function ManagementOverview({ state, period, previous, metrics, before, days, professionalId, specialty, chart }: {
-  state: DemoState; period: Period; previous: Period; metrics: Metrics; before: Metrics; days: number;
-  professionalId: string; specialty: string; chart: ReactNode;
+export function ManagementOverview({ state, period, previous, metrics, before, days, professionalId, specialty }: {
+  state: DemoState; period: Period; previous: Period; metrics: Metrics; before: Metrics; days: number; professionalId: string; specialty: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const definitions = useRef<HTMLDetailsElement>(null);
   const sortValue = params.get('sort');
   const sort: ManagementSort = managementSorts.includes(sortValue as ManagementSort) ? sortValue as ManagementSort : 'completed';
+  const activeColumn = resolveSort(sort);
   const order = params.get('order') === 'asc' ? 'asc' : 'desc';
-  const rows = professionalMetrics(state, period, professionalId, specialty, sort, order);
+  const compare = params.get('compare') !== '0';
+  const filters = { professionalId, specialty };
+  const { rows, total } = professionalActivity(state, filters, period, previous, sort, order);
+  const outcome = outcomeBreakdown(state, filters, period, previous);
+  const pending = outcome.emAbertoEncerradas;
+  const professional = state.professionals.find(p => p.id === professionalId);
+  const specialties = Array.from(new Set([...state.clinic.specialties, ...state.appointments.map(a => a.specialty)])).sort();
+
   function filter(changes: Record<string, string | null>) {
     const next = new URLSearchParams(params.toString());
     for (const [key, value] of Object.entries(changes)) {
@@ -55,54 +65,185 @@ export function ManagementOverview({ state, period, previous, metrics, before, d
     if (specialty) query.set('specialty', specialty);
     return `/gestao/agenda?${query}`;
   }
-  const stats = [
-    { key: 'planned', label: 'Consultas previstas', value: String(metrics.planned), baseline: String(before.planned), detail: 'Agendadas e confirmadas', href: agendaHref('previstas'), rate: false, preference: 'neutral' },
-    { key: 'completed', label: 'Consultas realizadas', value: String(metrics.completed), baseline: String(before.completed), detail: 'Resultados registrados', href: agendaHref('realizada'), rate: false, preference: 'higher' },
-    { key: 'occupancy', label: 'Ocupação da agenda', value: ratio(metrics.occupancy), baseline: ratio(before.occupancy), detail: `${hours(metrics.bookedMinutes)} ocupadas / ${hours(metrics.availableMinutes)} disponíveis`, href: agendaHref(), rate: true, preference: 'neutral' },
-    { key: 'absenceRate', label: 'Taxa de faltas', value: ratio(metrics.absenceRate), baseline: ratio(before.absenceRate), detail: `${metrics.missed} falta(s) / ${metrics.completed + metrics.missed} resultados`, href: agendaHref('falta'), rate: true, preference: 'lower' },
-  ] as const;
-  const outcomes = [
-    { label: 'Realizadas', key: 'completed', status: 'realizada', preference: 'higher' },
-    { label: 'Canceladas', key: 'cancelled', status: 'cancelada', preference: 'lower' },
-    { label: 'Faltas', key: 'missed', status: 'falta', preference: 'lower' },
-    { label: 'Agendadas e confirmadas', key: 'planned', status: 'previstas', preference: 'neutral' },
-  ] as const;
+  // Equipe accepts `days` = 7 or 30; "Hoje" opens the default week.
+  const teamHref = (id: string) => `/gestao/equipe?id=${id}${days === 30 ? '&days=30' : ''}`;
+  function openDefinitions() {
+    const element = definitions.current; if (!element) return;
+    element.open = true; element.querySelector('summary')?.focus();
+  }
 
-  return <div className="page-stack management-overview">
-    <PageHeading eyebrow="GESTÃO · ANÁLISE" title="Visão gerencial" />
-    <div className="management-toolbar" role="group" aria-label="Filtros da análise">
-      <label className="field"><span>Período</span><span className="management-period"><select aria-label="Período dos indicadores" value={days} onChange={e => filter({ period: e.target.value })}><option value="1">Hoje</option><option value="7">Últimos 7 dias</option><option value="30">Últimos 30 dias</option></select></span></label>
-      <label className="field"><span>Profissional</span><select value={professionalId} onChange={e => filter({ professional: e.target.value })}><option value="">Todos os profissionais</option>{state.professionals.map(p => <option key={p.id} value={p.id}>{p.name}{!p.active ? ' · Inativo' : ''}</option>)}</select></label>
-      <label className="field"><span>Especialidade</span><select value={specialty} onChange={e => filter({ specialty: e.target.value })}><option value="">Todas as especialidades</option>{Array.from(new Set([...state.clinic.specialties, ...state.appointments.map(a => a.specialty)])).sort().map(s => <option key={s}>{s}</option>)}</select></label>
-      {(professionalId || specialty) && <Button variant="ghost" onClick={() => filter({ professional: null, specialty: null })}>Limpar filtros</Button>}
+  const results = metrics.completed + metrics.missed;
+  const kpis: KpiItem[] = [
+    { title: 'Consultas realizadas', value: String(metrics.completed), detail: 'Resultados registrados no período', href: agendaHref('realizada'), change: metricComparison(metrics.completed, before.completed, false, 'higher'), reference: String(before.completed) },
+    { title: 'Ocupação da agenda', value: ratio(metrics.occupancy), detail: `${decimal(metrics.bookedMinutes / 60)} h ocupadas de ${decimal(metrics.availableMinutes / 60)} h disponíveis`, href: agendaHref(), change: metricComparison(metrics.occupancy, before.occupancy, true, 'neutral'), reference: ratio(before.occupancy) },
+    { title: 'Taxa de faltas', value: ratio(metrics.absenceRate), detail: `${plural(metrics.missed, 'falta', 'faltas')} em ${plural(results, 'resultado', 'resultados')}`, href: agendaHref('falta'), change: metricComparison(metrics.absenceRate, before.absenceRate, true, 'lower'), reference: ratio(before.absenceRate) },
+    { title: 'Canceladas', value: String(metrics.cancelled), detail: metrics.total ? `${(metrics.cancelled / metrics.total * 100).toFixed(1).replace('.', ',')}% das consultas previstas` : 'Sem dados', href: agendaHref('cancelada'), change: metricComparison(metrics.cancelled, before.cancelled, false, 'lower'), reference: String(before.cancelled) },
+  ];
+
+  const chartData = dailyChartData(state, period, days, professionalId, specialty);
+  const previousDays = previousDailyTotals(state, filters, period);
+  const reference = {
+    label: 'Total do período anterior', values: previousDays.map(d => d.total), details: previousDays.map(d => dayDetail(d.date)),
+    visible: compare, onToggle: () => filter({ compare: compare ? '0' : null }), singleLabel: `Ontem: ${previousDays[0]?.total ?? 0}`,
+  };
+
+  const outcomeRows = [
+    { key: 'realizadas', label: 'Realizadas', color: 'var(--data-realizadas)', preference: 'higher' },
+    { key: 'faltas', label: 'Faltas', color: 'var(--data-faltas)', preference: 'lower' },
+    { key: 'canceladas', label: 'Canceladas', color: 'var(--data-canceladas)', preference: 'lower' },
+    { key: 'emAberto', label: 'Em aberto', color: 'var(--data-em-aberto)', preference: 'neutral' },
+  ] as const;
+  const share = (value: number) => outcome.current.total ? Math.round(value / outcome.current.total * 100) : 0;
+
+  const filtered = !!(professionalId || specialty);
+  const professionalOptions = [{ id: '', label: 'Todos os profissionais' }, ...state.professionals.map(p => ({ id: p.id, label: p.name, sub: `${p.specialties.join(', ')}${p.active ? '' : ' · Inativo'}`, professional: p }))];
+  const specialtyOptions = [{ id: '', label: 'Todas as especialidades' }, ...specialties.map(s => ({ id: s, label: s }))];
+
+  return <div className="management-overview">
+    <PageHeading trail={['Gestão', 'Visão gerencial']} title="Visão gerencial" />
+
+    <div className="management-bar" role="toolbar" aria-label="Recorte da análise">
+      <Menu label={`Período dos indicadores: ${periodOptions.find(o => o.value === days)?.label}`} icon={<Calendar size={16} aria-hidden="true" />}
+        text={<><span>{periodOptions.find(o => o.value === days)?.label}</span><ChevronDown size={14} aria-hidden="true" /></>}
+        triggerClassName="btn btn-secondary management-period-trigger" className="management-period-menu"
+        items={periodOptions.map(o => ({ label: o.label, checked: o.value === days, onSelect: () => filter({ period: String(o.value) }) }))}
+        footer="Sempre comparado ao período anterior de mesma duração." />
+      <p className="management-interval tabular"><span>{shortPeriod(period)}</span> <span className="management-interval-ref">· comparado a {shortPeriod(previous)}</span></p>
+      <span className="management-divider" aria-hidden="true" />
+      <div className="management-chips">
+        <FilterChip name="Profissional" removeLabel="Remover filtro de profissional" value={professionalId} valueLabel={professional?.name ?? (professionalId ? 'Profissional removido' : '')}
+          options={professionalOptions} onChange={id => filter({ professional: id || null })} />
+        <FilterChip name="Especialidade" removeLabel="Remover filtro de especialidade" value={specialty} valueLabel={specialty}
+          options={specialtyOptions} onChange={value => filter({ specialty: value || null })} />
+        {filtered && <Button variant="ghost" className="management-clear" onClick={() => filter({ professional: null, specialty: null })}>Limpar filtros</Button>}
+      </div>
+      <span className="management-spacer" />
+      <Button variant="ghost" size="icon" className="management-info" aria-label="Como calculamos estes indicadores" onClick={openDefinitions}><Info size={16} /></Button>
     </div>
-    <div className="management-period-caption"><strong>{formatPeriod(period)}</strong><span>Comparado a {formatPeriod(previous)} · {days} dia(s) em cada período</span></div>
-    <div className="metric-grid">{stats.map(stat => <Link key={stat.key} href={stat.href} className="metric-card">
-      <div className="metric-label">{stat.label}</div><div className={`metric-value ${stat.value === 'Sem dados' ? 'no-data' : ''}`}>{stat.value}</div><div className="metric-detail">{stat.detail}</div>
-      <div className="management-baseline">Anterior: {stat.baseline}</div><Change current={metrics[stat.key]} previous={before[stat.key]} rate={stat.rate} preference={stat.preference} />
-    </Link>)}</div>
+
+    {pending > 0 && <div className="management-pending" role="status">
+      <Clock size={16} aria-hidden="true" />
+      <p><strong>{plural(pending, 'consulta', 'consultas')}</strong> já {pending === 1 ? 'passou' : 'passaram'} do horário e {pending === 1 ? 'está' : 'estão'} sem resultado. Realizadas, faltas e ocupação mudam quando forem registradas.</p>
+      <Link className="btn btn-secondary management-pending-action" href={agendaHref('pendente')}>Registrar resultados<ArrowRight size={14} aria-hidden="true" /></Link>
+    </div>}
+
+    <KpiStrip className="management-kpis" items={kpis} />
 
     <div className="management-analysis-grid">
-      <section className="card management-trend" aria-labelledby="management-trend-title"><div className="card-header"><div><h2 id="management-trend-title">Evolução das consultas</h2><p>Resultados por data prevista da consulta</p></div><Link className="text-link" href={agendaHref()}>{metrics.total} consultas <ArrowUpRight size={14} /></Link></div>{chart}</section>
-      <section className="card management-outcomes" aria-labelledby="management-outcomes-title"><div className="card-header"><div><h2 id="management-outcomes-title">Resultados do período</h2><p>Atual e anterior · mesma duração</p></div></div>
-        <div className="table-wrap"><table className="data-table" data-density="compact"><caption className="sr-only">Resultados comparados ao período anterior</caption><thead><tr><th scope="col">Situação</th><th scope="col" className="numeric">Atual</th><th scope="col" className="numeric">Anterior</th></tr></thead><tbody>{outcomes.map(outcome => <tr key={outcome.key}><th scope="row"><Link href={agendaHref(outcome.status)}>{outcome.label}</Link></th><td className="numeric">{metrics[outcome.key]}</td><td className="numeric">{before[outcome.key]}</td></tr>)}</tbody><tfoot><tr><th scope="row">Total de consultas</th><td className="numeric">{metrics.total}</td><td className="numeric">{before.total}</td></tr></tfoot></table></div>
-        <p className="management-note">{metrics.pending} consulta(s) com horário encerrado aguardando resultado. Cancelamentos usam a data prevista da consulta.</p>
+      <section className="card management-chart" aria-labelledby="management-chart-title">
+        <div className="management-card-head">
+          <div><h2 id="management-chart-title">Consultas por dia</h2><p>Pela data prevista · composição por resultado</p></div>
+          <Link className="management-link" href={agendaHref()}>{plural(metrics.total, 'consulta', 'consultas')} · Ver na agenda<ArrowRight size={14} aria-hidden="true" /></Link>
+        </div>
+        <StackedBarChart series={chartSeries} data={chartData} reference={reference} label={`Consultas por dia e resultado, ${formatPeriod(period)}. Dados completos na tabela abaixo.`} tableCaption={`Consultas por dia e resultado, ${formatPeriod(period)}, com o total do período anterior`} />
+      </section>
+
+      <section className="card management-outcomes" aria-labelledby="management-outcomes-title">
+        <div className="management-card-head"><div><h2 id="management-outcomes-title">Desfecho das consultas</h2><p>{plural(outcome.current.total, 'consulta prevista', 'consultas previstas')} no período</p></div></div>
+        <div className="outcome-bar" role="img" aria-label={`Desfecho: ${outcomeRows.map(r => `${r.label} ${share(outcome.current[r.key])}%`).join(', ')}`}>
+          {outcome.current.total === 0 ? <span className="outcome-bar-empty" /> : outcomeRows.map(r => outcome.current[r.key] > 0 && <span key={r.key} style={{ flexGrow: outcome.current[r.key], background: r.color }} />)}
+        </div>
+        <table className="outcome-table">
+          <caption className="sr-only">Desfecho das consultas comparado ao período anterior</caption>
+          <thead><tr><th scope="col">Situação</th><th scope="col">Atual</th><th scope="col">Anterior</th><th scope="col">Diferença</th></tr></thead>
+          <tbody>{outcomeRows.map(r => {
+            const current = outcome.current[r.key]; const before = outcome.previous[r.key];
+            const tone = deltaTone(current, before, r.preference);
+            return <tr key={r.key} data-outcome={r.key}>
+              <th scope="row"><i className="outcome-swatch" style={{ background: r.color }} aria-hidden="true" />{r.label}{r.key === 'emAberto' && outcome.emAbertoEncerradas > 0 && <small>{outcome.emAbertoEncerradas} já {outcome.emAbertoEncerradas === 1 ? 'passou' : 'passaram'} do horário</small>}</th>
+              <td className="tabular">{current}</td><td className="tabular outcome-previous">{before}</td>
+              <td className="tabular outcome-delta" data-tone={tone}>{signedCountDelta(current, before)}{tone !== 'neutral' && <span className="sr-only"> · Variação {tone === 'positive' ? 'favorável' : 'desfavorável'}</span>}</td>
+            </tr>;
+          })}</tbody>
+          <tfoot><tr data-outcome="total"><th scope="row">Total</th><td className="tabular">{outcome.current.total}</td><td className="tabular outcome-previous">{outcome.previous.total}</td><td className="tabular outcome-delta" data-tone="neutral">{signedCountDelta(outcome.current.total, outcome.previous.total)}</td></tr></tfoot>
+        </table>
+        <p className="management-footnote">Cancelamentos contam pela data prevista da consulta, não pela data em que foram feitos.</p>
       </section>
     </div>
 
     <section className="card management-professionals" aria-labelledby="management-professionals-title">
-      <div className="card-header"><div><h2 id="management-professionals-title">Atividade por profissional</h2><p>Disponibilidade efetiva e resultados do período selecionado</p></div><Badge>{rows.length} {rows.length === 1 ? 'profissional' : 'profissionais'}</Badge></div>
-      <p className="management-note">Disponibilidade compartilhada entre especialidades, com bloqueios descontados. Comparações não representam qualidade clínica.</p>
-      <div className="table-wrap" tabIndex={0} role="region" aria-label="Tabela de atividade por profissional"><table className="data-table" data-density="compact"><caption className="sr-only">Todos os profissionais do recorte. Selecione um cabeçalho para ordenar.</caption>
-        <thead><tr>{columns.map(column => <th key={column.key} scope="col" className={column.key === 'name' ? '' : 'numeric'} aria-sort={sort === column.key ? order === 'asc' ? 'ascending' : 'descending' : 'none'}><button className="management-sort" type="button" aria-label={`Ordenar por ${column.label}`} onClick={() => filter({ sort: column.key, order: sort === column.key ? order === 'asc' ? 'desc' : 'asc' : column.key === 'name' ? 'asc' : 'desc' })}>{column.label}{sort === column.key ? order === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} /> : <ArrowUpDown size={13} />}</button></th>)}</tr></thead>
-        <tbody>{rows.map(({ professional, metrics: row }) => <tr key={professional.id} data-professional-id={professional.id}>
-          <th scope="row"><Link href={`/gestao/equipe?id=${professional.id}`} className="management-person">{professional.name}<ArrowUpRight size={13} aria-hidden="true" /></Link><small>{professional.specialties.join(', ')}{!professional.active && ' · Inativo'}{specialty && !professional.specialties.includes(specialty) && ` · Histórico: ${specialty}`}</small></th>
-          <td className="numeric"><Link href={agendaHref('previstas', professional.id)}>{row.planned}</Link></td><td className="numeric"><Link href={agendaHref('realizada', professional.id)}>{row.completed}</Link></td><td className="numeric">{hours(row.availableMinutes)}</td><td className="numeric"><Occupancy value={row.occupancy} /></td><td className="numeric">{row.cancelled}</td><td className="numeric">{row.missed}</td><td className="numeric">{ratio(row.absenceRate)}</td>
-        </tr>)}{!rows.length && <tr><td colSpan={columns.length} className="management-empty">Nenhum profissional neste recorte. Ajuste os filtros para comparar os registros.</td></tr>}</tbody>
-        {rows.length > 0 && <tfoot><tr><th scope="row">Total do recorte</th><td className="numeric">{metrics.planned}</td><td className="numeric">{metrics.completed}</td><td className="numeric">{hours(metrics.availableMinutes)}</td><td className="numeric">{ratio(metrics.occupancy)}</td><td className="numeric">{metrics.cancelled}</td><td className="numeric">{metrics.missed}</td><td className="numeric">{ratio(metrics.absenceRate)}</td></tr></tfoot>}
-      </table></div>
-      <p className="management-note">Exibindo todos os profissionais do recorte ({rows.length}). Taxas totais usam os denominadores agregados, sem média simples das taxas individuais.</p>
+      <div className="management-card-head management-professionals-head">
+        <div><h2 id="management-professionals-title">Atividade por profissional</h2><p>Disponibilidade já desconta bloqueios. Os números comparam agenda, não qualidade clínica.</p></div>
+        <Badge>{plural(rows.length, 'profissional', 'profissionais')}</Badge>
+      </div>
+      {rows.length ? <>
+        <div className="table-wrap management-table-wrap" tabIndex={0} role="region" aria-label="Tabela de atividade por profissional">
+          <table className="data-table activity-table"><caption className="sr-only">Todos os profissionais do recorte. Selecione um cabeçalho para ordenar.</caption>
+            <thead><tr>{columns.map(column => {
+              const active = activeColumn === column.key;
+              return <th key={column.key} scope="col" className={`${column.numeric ? 'numeric' : ''}${active ? ' is-sorted' : ''}`} aria-sort={active ? order === 'asc' ? 'ascending' : 'descending' : 'none'}>
+                <button className="management-sort" type="button" aria-label={`Ordenar por ${column.label}`} onClick={() => filter({ sort: column.key, order: active ? order === 'asc' ? 'desc' : 'asc' : column.key === 'name' ? 'asc' : 'desc' })}>
+                  {column.label}{active && order === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />}
+                </button>
+              </th>;
+            })}<th scope="col" className="activity-chevron"><span className="sr-only">Abrir</span></th></tr></thead>
+            <tbody>{rows.map(row => <ActivityTableRow key={row.professional.id} row={row} specialty={specialty} href={teamHref(row.professional.id)} onOpen={href => router.push(href)} />)}</tbody>
+            <tfoot><tr><th scope="row">Total do recorte</th><ActivityCells row={total} /><td className="activity-chevron" /></tr></tfoot>
+          </table>
+        </div>
+        <p className="management-table-note">Taxas do total usam os denominadores somados, não a média das taxas individuais.</p>
+      </> : <EmptyState title="Nenhum profissional neste recorte" description="Ajuste os filtros para comparar os registros."><Button variant="secondary" onClick={() => filter({ professional: null, specialty: null })}>Limpar filtros</Button></EmptyState>}
     </section>
-    <details className="metric-definitions"><summary>Como calculamos estes indicadores</summary><p>Previstas: agendadas e confirmadas. Taxa de faltas: faltas ÷ (realizadas + faltas). Ocupação: duração das consultas não canceladas ÷ disponibilidade efetiva, descontando bloqueios. As taxas variam em pontos percentuais. Sem disponibilidade ou resultados: sem dados. Contagens com base anterior zero não têm comparação relativa. Períodos históricos preservam a disponibilidade registrada. Fuso: America/Recife.</p></details>
+
+    <details className="card metric-definitions management-definitions" ref={definitions}>
+      <summary><Info size={13} aria-hidden="true" />Como calculamos estes indicadores</summary>
+      <p>Em aberto: agendadas e confirmadas, ainda sem resultado. Taxa de faltas: faltas ÷ (realizadas + faltas). Ocupação: duração das consultas não canceladas ÷ disponibilidade efetiva, descontando bloqueios. Canceladas: percentual sobre o total de consultas previstas no período. Contagens comparam pela diferença absoluta; as taxas variam em pontos percentuais. Base anterior zero: sem base de comparação. Sem disponibilidade ou resultados: sem dados. Períodos históricos preservam a disponibilidade registrada. Fuso: America/Recife.</p>
+      <p>O marcador tracejado do gráfico compara cada dia com o dia na mesma posição do período anterior.</p>
+    </details>
+  </div>;
+}
+
+function ActivityCells({ row }: { row: Omit<ActivityRow, 'professional'> }) {
+  const delta = countDelta(row.realizadas, row.realizadasAnterior);
+  const tone = deltaTone(row.realizadas, row.realizadasAnterior, 'higher');
+  const occupancy = row.ocupacao;
+  return <>
+    <td className="numeric"><span className="cell-strong">{row.realizadas}</span><small className="activity-delta" data-tone={delta.kind === 'no-base' ? 'neutral' : tone}>{delta.kind === 'no-base' ? `Sem base · anterior: ${row.realizadasAnterior}` : `${formatCountDelta(delta)} vs. ${row.realizadasAnterior}`}{tone !== 'neutral' && delta.kind !== 'no-base' && <span className="sr-only"> · Variação {tone === 'positive' ? 'favorável' : 'desfavorável'}</span>}</small></td>
+    <td className="activity-occupancy"><span className="activity-occupancy-line"><strong>{ratio(occupancy)}</strong><small>{decimal(row.horasOcupadas)} de {decimal(row.horasDisponiveis)} h</small></span><span className="activity-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, occupancy ?? 0))}%` }} /></span></td>
+    <td className="numeric"><span className="cell-strong">{row.faltas}</span><small>{ratio(row.taxaFaltas)}</small></td>
+    <td className="numeric">{row.canceladas}</td>
+    <td className="numeric activity-open">{row.emAberto}</td>
+  </>;
+}
+
+function ActivityTableRow({ row, specialty, href, onOpen }: { row: ActivityRow; specialty: string; href: string; onOpen: (href: string) => void }) {
+  const { professional } = row;
+  return <tr className="activity-row" data-professional-id={professional.id} onClick={event => { if (!(event.target as HTMLElement).closest('a')) onOpen(href); }}>
+    <th scope="row">
+      <Link className="activity-row-link" href={href} aria-label={`Abrir ${professional.name} na Equipe`}>
+        <ProfessionalAvatar professional={professional} size={32} />
+        <span className="activity-person"><span className="activity-name">{professional.name}</span><small>{professional.specialties.join(', ')}{!professional.active && ' · Inativo'}{specialty && !professional.specialties.includes(specialty) && ` · Histórico: ${specialty}`}</small></span>
+      </Link>
+    </th>
+    <ActivityCells row={row} />
+    <td className="activity-chevron"><ChevronRight size={16} aria-hidden="true" /></td>
+  </tr>;
+}
+
+type ChipOption = { id: string; label: string; sub?: string; professional?: { name: string; color: string } };
+/** Filter chip (Pacientes pattern): dashed when empty, solid with "Nome: valor" and a
+ * separate "×" when applied; opens a single-choice list in a `Popover`. */
+function FilterChip({ name, value, valueLabel, options, onChange, removeLabel }: { name: string; value: string; valueLabel: string; options: ChipOption[]; onChange: (value: string) => void; removeLabel: string }) {
+  const applied = !!value;
+  function onKey(event: KeyboardEvent<HTMLDivElement>, close: () => void) {
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="option"]'));
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    const target = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: items.length - 1 }[event.key];
+    if (target !== undefined) { event.preventDefault(); items[Math.max(0, Math.min(items.length - 1, target))]?.focus(); return; }
+    if ((event.key === 'Enter' || event.key === ' ') && index >= 0) { event.preventDefault(); onChange(items[index].dataset.value ?? ''); close(); }
+  }
+  return <div className={`recorte-chip-group${applied ? ' is-applied' : ''}`}>
+    <Popover label={`Filtrar por ${name.toLocaleLowerCase('pt-BR')}`} triggerClassName="recorte-chip" className="chip-popover"
+      triggerLabel={applied ? `${name}: ${valueLabel}` : `Filtrar por ${name.toLocaleLowerCase('pt-BR')}`}
+      triggerContent={applied ? <><span className="recorte-chip-prefix">{name}:</span> <span className="recorte-chip-value">{valueLabel}</span></> : <><Plus size={14} aria-hidden="true" />{name}</>}>
+      {close => <div role="listbox" aria-label={name} className="chip-options" onKeyDown={event => onKey(event, close)}>
+        {options.map((option, index) => <div key={option.id || 'all'} role="option" tabIndex={(value ? option.id === value : index === 0) ? 0 : -1} aria-selected={option.id === value} data-value={option.id} className={`chip-option${index === 0 ? ' is-all' : ''}`} onClick={() => { onChange(option.id); close(); }}>
+            <span className="chip-option-check" aria-hidden="true">{option.id === value && <Check size={14} />}</span>
+            {option.professional && <ProfessionalAvatar professional={option.professional} size={26} />}
+            <span className="chip-option-text"><span>{option.label}</span>{option.sub && <small>{option.sub}</small>}</span>
+          </div>)}
+      </div>}
+    </Popover>
+    {applied && <button type="button" className="recorte-chip-remove" aria-label={removeLabel} onClick={() => onChange('')}><X size={14} aria-hidden="true" /></button>}
   </div>;
 }

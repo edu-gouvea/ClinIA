@@ -280,3 +280,15 @@ test('service preserves old and new ownership events through return and escalati
   assert.equal(conversation.messages.at(-1)?.authorId, 'ia');
   assert.equal(conversation.events.find((event) => event.type === 'conversation.claim')?.authorId, state.currentUserId);
 });
+
+test('demo seed: today, appointments starting at or after `now` are only agendada/confirmada', () => {
+  for (const reference of ['2026-11-09', '2026-11-16', '2027-02-27']) {
+    const state = createDemoState(reference);
+    const now = state.now.slice(11, 16);
+    const today = state.appointments.filter(a => a.date === state.referenceDate);
+    assert.ok(today.some(a => a.start >= now), `${reference}: há consultas depois de agora`);
+    for (const appointment of today.filter(a => a.start >= now)) assert.ok(['agendada', 'confirmada'].includes(appointment.status), `${appointment.id} ${appointment.start} ${appointment.status}`);
+    // Earlier finished slots still carry outcomes, so the demo keeps its history.
+    assert.ok(today.some(a => a.start < now && ['realizada', 'falta', 'cancelada'].includes(a.status)));
+  }
+});
