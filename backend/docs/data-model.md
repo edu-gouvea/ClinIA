@@ -5,6 +5,7 @@
 - Toda tabela tem `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`, `created_at TIMESTAMPTZ DEFAULT now()` e `updated_at TIMESTAMPTZ DEFAULT now()`.
 - Toda tabela exceto `clinics` tem `clinic_id UUID NOT NULL REFERENCES clinics(id)`.
 - Datas/horas: `TIMESTAMPTZ` em UTC. Exibição calculada no fuso de `clinics.timezone`.
+- Fuso padrão: `America/Sao_Paulo` (Brasília). Hardcoded no MVP; `clinics.timezone` fica na tabela para suporte futuro.
 - Naming convention de constraints: `pk_<table>`, `uq_<table>_<col>`, `fk_<table>_<col>_<ref>`, `ck_<table>_<constraint>`, `ix_<col_label>`.
 
 ---
@@ -69,7 +70,6 @@ erDiagram
         smallint weekday
         time start_time
         time end_time
-        boolean is_active
     }
     availability_blocks {
         uuid id PK
@@ -207,7 +207,7 @@ erDiagram
 |--------|------|------------|-----------|
 | `name` | VARCHAR(255) | NOT NULL | |
 | `slug` | VARCHAR(100) | UNIQUE NOT NULL | Identificador URL-safe |
-| `timezone` | VARCHAR(60) | NOT NULL DEFAULT `'America/Fortaleza'` | Fuso IANA |
+| `timezone` | VARCHAR(60) | NOT NULL DEFAULT `'America/Sao_Paulo'` | Fuso IANA — padrão Brasília |
 | `address` | TEXT | | |
 | `phone` | VARCHAR(30) | | |
 | `whatsapp_phone_number_id` | VARCHAR(100) | UNIQUE | ID do número no WhatsApp Business API |
@@ -300,7 +300,8 @@ Horários semanais recorrentes.
 | `weekday` | SMALLINT | NOT NULL — `0=segunda, 1=terça … 6=domingo` | Convenção do CRM |
 | `start_time` | TIME | NOT NULL | |
 | `end_time` | TIME | NOT NULL CHECK `end_time > start_time` | |
-| `is_active` | BOOLEAN | NOT NULL DEFAULT TRUE | |
+
+Sem `is_active` — regras são apagadas de verdade (DELETE com auditoria).
 
 Sem sobreposição no mesmo `(professional_id, weekday)` — constraint de exclusão com `btree_gist`.
 
@@ -430,7 +431,7 @@ Partial unique index: `UNIQUE (clinic_id, external_id) WHERE external_id IS NOT 
 | `category` | VARCHAR(50) | NOT NULL — `faq, policy, preparation, pricing, general` |
 | `content` | TEXT | NOT NULL |
 | `is_active` | BOOLEAN | NOT NULL DEFAULT TRUE |
-| `search_vector` | TSVECTOR | gerado via trigger em `title || content` |
+| `search_vector` | TSVECTOR | gerado via trigger; configuração `pt_unaccent` (`websearch_to_tsquery`, `ts_rank`), máx 3 resultados |
 
 ---
 
@@ -467,33 +468,97 @@ Ver seção seguinte.
 
 ---
 
-## Dúvidas em aberto
+## Decisões arquiteturais
 
-> Estas questões precisam de resposta antes de começar a Fase 2 (models + migrations).
+Todas as decisões abaixo foram tomadas antes da Fase 2 (models + migrations).
 
-**D1 — `appointment.date` / `appointment.start` vs `starts_at`**
-O CRM usa dois campos separados: `date: "YYYY-MM-DD"` e `start: "HH:MM"`. O modelo proposto usa `starts_at TIMESTAMPTZ`. A API deve retornar `date` e `startTime` como campos calculados em camelCase? Ou o CRM será atualizado para trabalhar com `startsAt` ISO 8601?
+### Fuso horário (D1)
+`America/Sao_Paulo` (Brasília) hardcoded no MVP. A coluna `clinics.timezone` existe para suporte futuro.
 
-**D2 — `appointment.duration`**
-O CRM tem `duration: number` (minutos). No modelo, a duração é derivada de `ends_at - starts_at`. A API deve retornar `durationMinutes` calculado?
+### Soft-delete — padrão `is_active` (D2)
 
-**D3 — `patient.insurance` como string vs FK**
-O CRM associa o paciente a um convênio por **nome** (`insurance: string`). O modelo proposto **não** tem `insurance_id` em `patients` — o convênio está só no agendamento. O CRM deve passar a usar `insuranceId` ao criar/editar paciente, ou o backend deve aceitar um campo `insuranceName` e resolver o ID internamente?
+**Tabelas com `is_active BOOLEAN NOT NULL DEFAULT true`:** `clinics`, `users`, `specialties`, `professionals`, `insurances`, `knowledge_documents`.
+- `DELETE` nessas rotas só desativa (`is_active = false`). Quem desativou e quando fica em `audit_logs`.
+- Listagens retornam só ativos por padrão; `?includeInactive=true` serve para telas administrativas.
+- As ferramentas do agente e `/slots` enxergam só ativos.
+- Consultas de histórico (`appointments`, `conversations`) mostram o registro mesmo que relacionado a um inativo.
 
-**D4 — `knowledge.archived` vs `is_active`**
-O CRM usa `archived: boolean` (verdadeiro = arquivado). O modelo usa `is_active: boolean` (verdadeiro = ativo). São inversos. O CRM deve ser atualizado para usar `isActive`, ou a API expõe os dois?
+**Nomes únicos + reativação:** índices únicos continuam normais (ex.: `UNIQUE (clinic_id, name)`). Criar um nome que já existe inativo retorna `409 CONFLICT` com `existingId` nos detalhes do erro.
 
-**D5 — Status em inglês vs português**
-O CRM usa status em português (`agendada`, `confirmada`, `realizada`, `falta`, `ia`, `aguardando`, `humano`, `encerrada`). O modelo usa inglês (`pending`, `confirmed`, `completed`, `no_show`, `bot`, `waiting_human`, `human`, `closed`). A API devolve os valores em inglês e o CRM é atualizado para fazer o mapeamento, ou a API devolve em português para evitar retrabalho no frontend?
+**Tabelas sem `is_active`:**
+- `availability_blocks` e `availability_rules` — apagadas de verdade (DELETE com auditoria).
+- `appointments` e `conversations` — usam `status` como ciclo de vida.
+- `patients` — sem `is_active` e sem `deleted_at`; remoção é anonimização LGPD via `anonymized_at`.
+- `messages`, `human_handoffs`, `audit_logs` — nunca apagadas.
 
-**D6 — `professional.availability` embutida no tipo vs tabela separada**
-O CRM lida com disponibilidade como array dentro do profissional (`availability: WeekSlot[]`). O modelo tem a tabela `availability_rules` separada. O endpoint `GET /professionals/{id}` deve incluir `availabilityRules` embutido na resposta, ou o CRM faz uma segunda chamada para `GET /professionals/{id}/availability-rules`?
+### Profissionais e usuários (D3)
+Entidades separadas com vínculo opcional 1:1: `professionals.user_id FK(users) UNIQUE NULL`.
+- Profissional sem login é o caso normal; agenda gerida por admin/atendentes.
+- Usuário com `role = professional` DEVE estar vinculado a um profissional da mesma clínica.
+- **Desativar profissional desativa o usuário vinculado.** O contrário não vale.
 
-**D7 — Anotações de consulta (`ConsultationNote[]`)**
-O CRM tem `appointment.notes: ConsultationNote[]` — um array de notas com `{ id, text, professionalId, recordedByUserId, at }` (versões históricas). O modelo proposto tem apenas `appointments.notes TEXT` (uma única nota). Deve-se criar a tabela `appointment_notes` para suportar múltiplas versões, ou a tela de anotações será simplificada para uma única nota editável?
+### Duração de consulta (D4)
+Por profissional: `professionals.appointment_duration_minutes INT NOT NULL DEFAULT 30` (10–240 min).
+Mudar a duração afeta só slots futuros; agendamentos existentes mantêm `ends_at` gravado.
 
-**D8 — `conversation.reason` e handoff**
-O CRM tem `conversation.reason?: string` (motivo do pedido de transferência) como campo direto na conversa. O modelo tem `human_handoffs.reason`. O endpoint `GET /conversations` deve retornar `handoffReason` via JOIN ao `human_handoff` mais recente, ou o campo será duplicado na tabela `conversations`?
+### Remarcações (D5)
+Nada some; sem tabela de histórico separada.
+- `POST /appointments/{id}/reschedule` cria novo `pending` com `rescheduled_from_id` apontando para o original.
+- O original continua valendo até a decisão da clínica. Ao confirmar o novo → original vai a `cancelled` (razão: "remarcado"). Ao rejeitar o novo → original permanece.
+- Só uma remarcação pendente por agendamento; segunda tentativa retorna `409 RESCHEDULE_ALREADY_PENDING`.
+- Na resposta da API, o agendamento inclui `rescheduledFrom` (objeto: `startsAt`, `endsAt`, `professionalName`) e `rescheduledToId`.
+- Tela "Início": `GET /appointments?status=pending&reschedule=true` + campo `pendingReschedules` em `GET /dashboard/summary`.
 
-**D9 — `users.role` em inglês vs português**
-O CRM usa roles em português (`'Administradora'`, `'Atendente'`). O modelo usa inglês (`admin`, `attendant`). Mesma questão do D5 — atualizar o CRM ou a API retorna em português?
+### Base de conhecimento (D6)
+Busca full-text do PostgreSQL — sem embeddings no MVP.
+- Configuração `pt_unaccent`, `websearch_to_tsquery`, `ts_rank`; ferramenta `search_knowledge` devolve até 3 trechos.
+- Dados estruturados (endereço, horário, convênios) vêm de ferramentas dedicadas (`get_clinic_info`, `check_insurance`).
+- Busca semântica com pgvector fica como trabalho futuro; a interface da ferramenta não mudará.
+
+### Limites do WhatsApp (D7)
+Limites são da Meta — não implementamos limitador de envio no MVP.
+- Cada clínica tem `clinics.whatsapp_phone_number_id`. No MVP todas compartilham o mesmo token/portfolio Meta.
+- Tratar erros da Meta: `130429` (vazão excedida) → até 3 retries com backoff; depois `delivery_status = failed` + log + evento para o CRM.
+
+### Auditoria (D8)
+Ações registradas sempre com `actor_type` (`user`, `agent` ou `system`):
+
+| Categoria | Ações |
+|-----------|-------|
+| Acesso | login OK, login falho (sem senha em `data`) |
+| Administração | alterar clínica/settings; criar/editar/desativar usuários, especialidades, profissionais, convênios, documentos; alterar regras de agenda; criar/remover bloqueios |
+| Agendamentos | criar, confirmar, rejeitar, cancelar, remarcar, concluir, falta (inclusive pelo agente) |
+| Conversas | handoff solicitado, assumir, devolver à IA, encerrar |
+| LGPD | criar/editar paciente, exportar dados, anonimizar |
+
+Fora da auditoria: mensagens (ficam em `messages`), leituras/listagens (exceto exportação), ferramentas do agente.
+
+`data` guarda somente campos alterados (antes + depois). **Nunca** conter senha, token, conteúdo de mensagem ou dado de saúde.
+
+### Simulador (D9)
+Usa número fictício em E.164 — nunca o telefone real de alguém.
+- Gera número fictício por sessão; reaproveita até `POST /simulator/{slug}/reset`.
+- Usuário pode escolher o telefone de um paciente do seed para simular paciente já cadastrado.
+- Conversas do simulador ficam com `channel = simulator` (não se misturam com WhatsApp).
+- `SIMULATOR_ENABLED = true` apenas em desenvolvimento, demo ou clínica de demonstração.
+
+---
+
+## Questões ainda em aberto (CRM → backend)
+
+> Decisões necessárias para o CRM antes de consumir esses endpoints.
+
+**CQ1 — `appointment.date` / `appointment.start` vs `startsAt`**
+O CRM usa `date: "YYYY-MM-DD"` + `start: "HH:MM"`. A API retorna `startsAt` ISO 8601 UTC. O CRM precisa ser atualizado para consumir `startsAt`/`endsAt`/`durationMinutes` ou a API deve retornar campos calculados `date` e `startTime` adicionalmente?
+
+**CQ2 — `patient.insurance` como string vs `insuranceId`**
+O CRM usa `insurance: string` (nome). No modelo, convênio está só no agendamento (sem `insurance_id` em `patients`). O CRM deve passar a usar `insuranceId` ao criar/editar paciente, ou o backend aceita `insuranceName` e resolve internamente?
+
+**CQ3 — `professional.availability` embutida vs segunda chamada**
+O CRM exibe `availability: WeekSlot[]` dentro do profissional. `GET /professionals/{id}` deve incluir `availabilityRules` embutido ou o CRM faz `GET /professionals/{id}/availability-rules` separadamente?
+
+**CQ4 — `appointment.notes` como array vs texto único**
+O CRM tem `appointment.notes: ConsultationNote[]` (array com histórico). O modelo tem `appointments.notes TEXT` (uma nota). Simplificar para nota única editável, ou criar tabela `appointment_notes`?
+
+**CQ5 — `conversation.reason` como campo direto vs JOIN**
+O CRM usa `conversation.reason?: string`. O modelo tem `human_handoffs.reason`. O `GET /conversations` retorna `handoffReason` via JOIN ao handoff mais recente, ou duplica o campo em `conversations`?

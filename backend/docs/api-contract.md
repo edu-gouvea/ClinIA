@@ -24,6 +24,15 @@ Campos internos do banco (snake_case) → respostas da API (camelCase).
 
 ---
 
+## Comportamento padrão — recursos com `is_active`
+
+- Listagens retornam **somente registros ativos** por padrão.
+- `?includeInactive=true` habilita a visão administrativa (retorna ativos e inativos).
+- Endpoints do agente e `/slots` nunca aceitam `includeInactive`.
+- `POST` para recursos únicos por nome: se o nome já existe mas está inativo, retorna `409 CONFLICT` com `{ "error": { "code": "CONFLICT", "message": "...", "details": { "existingId": "uuid" } } }` para o CRM oferecer reativação.
+
+---
+
 ## Paginação
 
 Todos os endpoints de listagem retornam:
@@ -613,7 +622,7 @@ Acesso: `admin`. Apaga dados pessoais, preserva IDs e datas para estatísticas.
 
 Acesso: `admin`, `attendant`.
 
-**Query:** `professionalId`, `specialtyId`, `patientId`, `status`, `source`, `dateFrom`, `dateTo`, `page`, `pageSize`.
+**Query:** `professionalId`, `specialtyId`, `patientId`, `status`, `source`, `dateFrom`, `dateTo`, `reschedule` (boolean — `true` retorna só `pending` com `rescheduledFromId` preenchido), `page`, `pageSize`.
 
 **200:**
 ```json
@@ -635,7 +644,10 @@ Acesso: `admin`, `attendant`.
       "source": "dashboard",
       "cancellationReason": null,
       "notes": null,
+      "durationMinutes": 30,
       "rescheduledFromId": null,
+      "rescheduledFrom": null,
+      "rescheduledToId": null,
       "createdAt": "2026-11-15T09:00:00Z"
     }
   ],
@@ -672,7 +684,14 @@ Acesso: `admin`, `attendant`, `agent` (via serviço interno).
 
 Acesso: `admin`, `attendant`.
 
-**200:** objeto completo.
+**200:** objeto completo. Quando `rescheduledFromId` está preenchido, `rescheduledFrom` tem o formato:
+```json
+{
+  "startsAt": "2026-11-14T10:00:00Z",
+  "endsAt": "2026-11-14T10:30:00Z",
+  "professionalName": "Dra. Clara Mendes"
+}
+```
 
 ---
 
@@ -726,9 +745,15 @@ Acesso: `admin`, `attendant`.
 
 Acesso: `admin`, `attendant`.
 
-**Body:** mesmo de `POST /appointments` (cria novo agendamento vinculado). Erros: `409`, `422`.
+**Body:** mesmo de `POST /appointments` (cria novo agendamento vinculado).
 
-**201:** novo agendamento com `rescheduledFromId` preenchido.
+**201:** novo agendamento com `rescheduledFromId` preenchido e `rescheduledFrom` com dados do original.
+
+**Erros:** `409 RESCHEDULE_ALREADY_PENDING` (já existe remarcação pendente para este agendamento), `422`.
+
+**Regras:**
+- Só uma remarcação `pending` por agendamento; rejeitar o novo restaura o original.
+- Confirmar o novo muda o original para `cancelled` com `cancellationReason = "remarcado"`.
 
 ---
 
@@ -927,7 +952,7 @@ Acesso: `admin`, `attendant`.
     "conversationsWaiting": 2,
     "conversationsHuman": 1,
     "conversationsBot": 3,
-    "rescheduleRequests": 1,
+    "pendingReschedules": 1,
     "confirmationsPending": 4
   },
   "professionals": [
