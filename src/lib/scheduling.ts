@@ -1,4 +1,5 @@
-import { minutes } from './date';
+import { dateTime, minutes } from './date';
+import { getAvailability } from './metrics';
 import type { Appointment, Block, DemoState, Professional } from './types';
 
 export const isOpenAppointment = (appointment: Appointment) => ['agendada', 'confirmada'].includes(appointment.status);
@@ -9,6 +10,17 @@ export function getBlockConflicts(state: DemoState, block: Omit<Block, 'id'>): A
   return state.appointments.filter(a => a.professionalId === block.professionalId && a.date === block.date && a.status !== 'cancelada'
     && minutes(block.start) < minutes(a.start) + a.duration && minutes(block.end) > minutes(a.start))
     .sort((a, b) => a.start.localeCompare(b.start));
+}
+/** Future open appointments that the effective availability (clinic hours ∩ professional
+ * hours − blocks) no longer covers. They stay booked and need a manual review. Pass a
+ * proposed state to preview the effect of a schedule change before saving it. */
+export function appointmentsOutsideAvailability(state: DemoState, professionalId?: string): Appointment[] {
+  const now = new Date(state.now).getTime();
+  return state.appointments.filter(appointment => isOpenAppointment(appointment)
+    && (!professionalId || appointment.professionalId === professionalId)
+    && new Date(dateTime(appointment.date, appointment.start)).getTime() > now
+    && !getAvailability(state, appointment.professionalId, appointment.date).some(slot => minutes(slot.start) <= minutes(appointment.start)
+      && minutes(slot.end) >= minutes(appointment.start) + appointment.duration));
 }
 export function appointmentEnd(appointment: Pick<Appointment, 'start' | 'duration'>): string {
   const end = minutes(appointment.start) + appointment.duration;
@@ -45,10 +57,6 @@ export function calendarBounds(state: DemoState, days: string[]): { start: numbe
   const hours = state.clinic.hours.filter(slot => weekdays.has(slot.day));
   if (!hours.length) return null;
   return { start: Math.min(...hours.map(slot => minutes(slot.start))), end: Math.max(...hours.map(slot => minutes(slot.end))) };
-}
-
-export function agendaView(professionalId: string): 'day' | 'week' {
-  return professionalId ? 'week' : 'day';
 }
 
 /** Keep preserved records visible after inactivation or specialty changes. */

@@ -20,3 +20,6 @@ test-results/
 
 # Capturas geradas pelos testes E2E (regravadas a cada execução)
 /docs/qa/
+
+# Gerado pelo Next.js a cada dev/build (ver docs do Next: não versionar)
+next-env.d.ts

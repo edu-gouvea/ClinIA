@@ -9,7 +9,7 @@ import { appointmentEnd, calendarBounds, calendarColumns, cancellationReason, CA
 import { closedDaysNote, formatDayTitle, isClinicClosed, matchesAgendaStatus, offHoursBands, type AgendaView } from '@/lib/agenda-presentation';
 import { appointmentStatusLabels, appointmentStatusTones } from '@/lib/status-presentation';
 import type { Appointment, Block, DemoState, Professional } from '@/lib/types';
-import { ProfessionalAvatar } from './professional-avatar';
+import { ProfessionalAvatar } from '@/components/professional-avatar';
 
 export const PIXELS_PER_MINUTE = 2;
 export const slotKey = (professionalId: string, date: string) => `${professionalId}|${date}`;

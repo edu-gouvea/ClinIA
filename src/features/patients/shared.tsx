@@ -32,4 +32,4 @@ export function listHref(params: Params): string {
   if (page) next.set('page', page);
   return `/gestao/pacientes${next.size ? `?${next}` : ''}`;
 }
-export const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+export { plural } from '@/lib/format';

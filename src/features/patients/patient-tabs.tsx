@@ -7,7 +7,7 @@ import { useDemo } from '@/components/demo-provider';
 import { Badge, EmptyState, Field, Popover } from '@/components/ui';
 import { clinicDate, formatDate, formatTime } from '@/lib/date';
 import { relativeDay } from '@/lib/conversation-assistant';
-import { paginate, patientAppointmentsSplit, patientNotes, patientSessions } from '@/lib/patient-presentation';
+import { paginate, patientAppointmentsSplit, patientSessions } from '@/lib/patient-presentation';
 import { appointmentStatusPresentation } from '@/lib/status-presentation';
 import { isOpenAppointment } from '@/lib/scheduling';
 import { ConversationCard, conversationHeadline, type PatientLinks } from './patient-activity';
@@ -83,17 +83,5 @@ export function PatientConversationsTab({ patientId }: { patientId: string }) {
   return <ol className="card-list">{sessions.map(item => <li key={item.id}>
     <div className="timeline-line"><span className="timeline-text">{conversationHeadline(item)}</span><span className="timeline-date tabular">{relativeDay(clinicDate(item.at), state.referenceDate)} · {formatTime(item.at)}</span></div>
     <ConversationCard item={item} />
-  </li>)}</ol>;
-}
-
-export function PatientNotesTab({ patientId, links }: { patientId: string; links: PatientLinks }) {
-  const { state } = useDemo();
-  const notes = patientNotes(state, patientId);
-  if (!notes.length) return <EmptyState title="Nenhuma anotação" description="As anotações aparecem aqui depois que uma consulta é realizada." />;
-  return <ol className="card-list">{notes.map(note => <li key={note.appointmentId} className="note-entry">
-    <div className="note-head"><strong>{note.author}</strong><span className="activity-meta tabular">{formatDate(note.at)} · {formatTime(note.at)}</span></div>
-    <Link className="activity-link" href={links.details(note.appointmentId)} scroll={false}>{note.specialty} · {formatDate(note.date, { day: 'numeric', month: 'short' })}</Link>
-    <p className="note-text">{note.text}</p>
-    <span className="activity-meta">versão {note.version}</span>
   </li>)}</ol>;
 }

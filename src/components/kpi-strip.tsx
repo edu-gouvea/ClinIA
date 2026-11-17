@@ -2,18 +2,25 @@ import Link from 'next/link';
 import type { metricComparison } from '@/lib/metric-comparison';
 
 export type MetricChangeValue = ReturnType<typeof metricComparison>;
-export type KpiItem = { title: string; value: string; detail: string; href: string; change: MetricChangeValue; reference?: string };
+/** `href` makes the cell a link to the records behind the number; `change` adds the
+ * comparison with the previous period. Both are optional: a plain cell just states a value. */
+export type KpiItem = { title: string; value: string; detail: string; href?: string; change?: MetricChangeValue; reference?: string };
 
-/** The KPI strip shared by Início and Visão gerencial: one container with 1 px dividers,
- * link cells (`metric-card`/`metric-value`), no decorative icons. `reference` names the
- * previous value ("vs. 119"); without it the line reads "vs. anterior". */
+/** The KPI strip shared by Início, Visão gerencial and Equipe: one container with 1 px
+ * dividers, `metric-card`/`metric-value` cells, no decorative icons. `reference` names
+ * the previous value ("vs. 119"); without it the line reads "vs. anterior". */
 export function KpiStrip({ items, className = '' }: { items: KpiItem[]; className?: string }) {
-  return <div className={`kpi-strip ${className}`}>{items.map(kpi => <Link href={kpi.href} className="metric-card" key={kpi.title}>
-    <span className="metric-label">{kpi.title}</span>
-    <span className={`metric-value tabular${kpi.value === 'Sem dados' ? ' no-data' : ''}`}>{kpi.value}</span>
-    <MetricChange change={kpi.change} reference={kpi.reference} />
-    <span className="metric-detail">{kpi.detail}</span>
-  </Link>)}</div>;
+  return <div className={`kpi-strip ${className}`}>{items.map(kpi => {
+    const content = <>
+      <span className="metric-label">{kpi.title}</span>
+      <span className={`metric-value tabular${kpi.value === 'Sem dados' ? ' no-data' : ''}`}>{kpi.value}</span>
+      {kpi.change && <MetricChange change={kpi.change} reference={kpi.reference} />}
+      <span className="metric-detail">{kpi.detail}</span>
+    </>;
+    return kpi.href
+      ? <Link href={kpi.href} className="metric-card" key={kpi.title}>{content}</Link>
+      : <div className="metric-card" key={kpi.title}>{content}</div>;
+  })}</div>;
 }
 
 /** Symmetric delta: ▲/▼ + magnitude (absolute for counts, p.p. for rates) + "vs. …";

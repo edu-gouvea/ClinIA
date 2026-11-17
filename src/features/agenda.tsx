@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CalendarRange, ChevronLeft, ChevronRight, Clock3, ListChecks, Lock, Plus } from 'lucide-react';
 import { useDemo } from '@/components/demo-provider';
+import { can, currentUser } from '@/lib/permissions';
 import { Button, Drawer, EmptyState, PageHeading, useIsNarrow, useMediaQuery, type MenuItem } from '@/components/ui';
 import { parseDateInput } from '@/components/date-time-fields';
 import { addDays, weekStart } from '@/lib/date';
@@ -12,18 +13,15 @@ import { agendaProfessionals, isOpenAppointment } from '@/lib/scheduling';
 import { countByStatus, isClinicClosed, matchesAgendaStatus, rangeTitle, rescheduleRequestIds, resolveAgendaView, statusChipLabels, statusChipOrder } from '@/lib/agenda-presentation';
 import { appointmentStatusTones } from '@/lib/status-presentation';
 import type { Appointment, Block, Professional } from '@/lib/types';
-// Compatibility re-export for modules (including the Eng_de_Software copy) that import from here.
-export { appointmentStatusLabels, appointmentStatusTones } from '@/lib/status-presentation';
 import { AppointmentForm } from './agenda/appointment-form';
 import { AppointmentDetails } from './agenda/appointment-details';
 import { BlockForm } from './agenda/block-form';
 import { CalendarCard, slotKey } from './agenda/calendar-grid';
 import { AgendaDayTable } from './agenda/agenda-list';
 import { ActiveFilterChips, DatePicker, FiltersPopover, ProfessionalPicker, shiftDate } from './agenda/agenda-toolbar';
-import { ProfessionalAvatar } from './agenda/professional-avatar';
+import { ProfessionalAvatar } from '@/components/professional-avatar';
 import { DayPanel } from './agenda/day-panel';
 import { breakpointQuery } from '@/lib/breakpoints';
-export { AppointmentForm } from './agenda/appointment-form';
 
 const byTime = (a: Appointment, b: Appointment) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`);
 
@@ -42,7 +40,12 @@ export function Agenda() {
   const editing = editRequested && isOpenAppointment(editRequested) ? editRequested : undefined;
   const detail = state.appointments.find(a => a.id === params.get('appointment'));
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [blockDraft, setBlockDraft] = useState<{ professionalId: string; date: string } | null>(null);
+  const [blockDraft, setBlockDraft] = useState<{ professionalId: string; date: string; block?: Block } | null>(null);
+  // Availability lives in Configurações (administration); the reception edits blocks here.
+  const manageAvailability = can(currentUser(state), 'clinic.manage');
+  const openBlock = (block: Block) => manageAvailability
+    ? router.push(`/gestao/configuracoes?tab=availability&professional=${block.professionalId}&block=${block.id}`)
+    : setBlockDraft({ professionalId: block.professionalId, date: block.date, block });
   const [saved, setSaved] = useState<{ id?: string; before: Set<string> } | null>(null);
   const [mobileIndex, setMobileIndex] = useState(0);
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -107,7 +110,7 @@ export function Agenda() {
   const openSlot = (id: string, day: string, time: string) => update({ new: '1', start: time, date: day, slotProfessional: id === professionalId ? null : id, appointment: null, edit: null });
   const professionalMenu = (professional: Professional): MenuItem[] => [
     { label: 'Ver semana', icon: <CalendarRange size={16} />, onSelect: () => router.push(weekHref(professional.id), { scroll: false }) },
-    { label: 'Gerenciar disponibilidade', icon: <Clock3 size={16} />, onSelect: () => router.push(`/gestao/configuracoes?tab=availability&professional=${professional.id}`) },
+    ...(manageAvailability ? [{ label: 'Gerenciar disponibilidade', icon: <Clock3 size={16} />, onSelect: () => router.push(`/gestao/configuracoes?tab=availability&professional=${professional.id}`) }] : []),
     { label: 'Bloquear horário', icon: <Lock size={16} />, onSelect: () => setBlockDraft({ professionalId: professional.id, date }) },
   ];
   function chooseView(next: 'dia' | 'semana') {
@@ -144,7 +147,7 @@ export function Agenda() {
     onSelectDate: changeDate, onSelect: (a: Appointment) => { setSummaryOpen(false); update({ selected: a.id }); }, onCloseSelection: closeSelection,
     onOpenDetails: (a: Appointment) => update({ appointment: a.id }), onReschedule: (a: Appointment) => update({ edit: a.id, selected: null }),
     onSlot: (time: string) => { setSummaryOpen(false); openSlot(focusProfessional.id, date, time); },
-    onBlock: (block: Block) => router.push(`/gestao/configuracoes?tab=availability&professional=${block.professionalId}&block=${block.id}`),
+    onBlock: openBlock, manageAvailability,
     onBlockTime: () => { setSummaryOpen(false); setBlockDraft({ professionalId: focusProfessional.id, date }); },
   };
   const aside = panelProps && docked ? <aside className="day-panel" aria-label="Painel do dia"><DayPanel {...panelProps} mode="both" /></aside> : undefined;
@@ -162,11 +165,11 @@ export function Agenda() {
       highlightId={highlightId} rescheduleIds={rescheduleIds} freeSlots={freeSlots} blocks={blocks} focusFirstFree={params.has('availability') || (params.get('view') === 'week' && !!professionalId)}
       strip={<>{strip}{switcher}</>} weekHref={weekHref} dayHref={dayHref} professionalMenu={professionalMenu}
       focus={focusMode} aside={aside} selectedId={selected?.id ?? detail?.id}
-      onSelectAppointment={selectAppointment} onSlot={openSlot} onBlock={block => router.push(`/gestao/configuracoes?tab=availability&professional=${block.professionalId}&block=${block.id}`)} />;
+      onSelectAppointment={selectAppointment} onSlot={openSlot} onBlock={openBlock} />;
   }
 
   return <div data-density="compact" className="page-stack agenda-page">
-    <PageHeading trail={['Gestão', 'Agenda']} title="Agenda" actions={<>
+    <PageHeading title="Agenda" actions={<>
       {!hasRange && <div className="segmented agenda-view-switch" role="group" aria-label="Visualização">
         <button type="button" aria-pressed={view === 'dia'} onClick={() => chooseView('dia')}>Dia</button>
         <button type="button" aria-pressed={view === 'semana'} onClick={() => chooseView('semana')}>Semana</button>
@@ -203,6 +206,6 @@ export function Agenda() {
       <div className="drawer-close"><Button variant="ghost" size="icon" aria-label="Fechar resumo" onClick={() => setSummaryOpen(false)}><ChevronRight size={18} /></Button></div>
       <DayPanel {...panelProps} mode="summary" />
     </Drawer>}
-    {blockDraft && <BlockForm professionalId={blockDraft.professionalId} initialDate={blockDraft.date} onClose={() => setBlockDraft(null)} />}
+    {blockDraft && <BlockForm block={blockDraft.block} professionalId={blockDraft.professionalId} initialDate={blockDraft.date} onClose={() => setBlockDraft(null)} />}
   </div>;
 }

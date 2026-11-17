@@ -100,7 +100,7 @@ test('atalho ao conteúdo e abas de configuração funcionam por teclado', async
   await expect(tabs.getByRole('tab', { name: 'Disponibilidade', exact: true })).toBeFocused();
   await page.keyboard.press('End');
   await expect(tabs.getByRole('tab', { name: 'Base de conhecimento', exact: true })).toBeFocused();
-  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'tab-knowledge');
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'settings-tab-knowledge');
   await page.keyboard.press('Home');
   await expect(tabs.getByRole('tab', { name: 'Clínica e horários' })).toBeFocused();
 });

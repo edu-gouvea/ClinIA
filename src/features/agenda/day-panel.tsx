@@ -19,7 +19,7 @@ type Props = {
   selected?: Appointment; rescheduleIds: Set<string>; context: string | null; marked: (date: string) => boolean;
   /** `both` = docked panel (calendar + summary/selection); the drawer shows one part. */
   mode: 'both' | 'summary' | 'selection';
-  weekHref: string; onSelectDate: (date: string) => void; onSelect: (appointment: Appointment) => void; onCloseSelection: () => void;
+  weekHref: string; manageAvailability: boolean; onSelectDate: (date: string) => void; onSelect: (appointment: Appointment) => void; onCloseSelection: () => void;
   onOpenDetails: (appointment: Appointment) => void; onReschedule: (appointment: Appointment) => void; onSlot: (start: string) => void;
   onBlock: (block: Block) => void; onBlockTime: () => void;
 };
@@ -36,7 +36,7 @@ export function DayPanel(props: Props) {
   </div>;
 }
 
-function Summary({ state, professional, date, appointments, freeSlots, blocks, weekHref, onSelect, onSlot, onBlock, onBlockTime }: Props) {
+function Summary({ state, professional, date, appointments, freeSlots, blocks, weekHref, manageAvailability, onSelect, onSlot, onBlock, onBlockTime }: Props) {
   const [expanded, setExpanded] = useState(false);
   const windows = getAvailability(state, professional.id, date);
   const now = new Date(state.now).getTime();
@@ -63,7 +63,7 @@ function Summary({ state, professional, date, appointments, freeSlots, blocks, w
     </button></li>)}</ul> : <p className="day-panel-empty">Nenhum bloqueio</p>}
     <footer className="day-panel-links">
       <Link className="text-link" href={weekHref}><CalendarRange size={16} aria-hidden="true" />Ver semana</Link>
-      <Link className="text-link" href={`/gestao/configuracoes?tab=availability&professional=${professional.id}`}><Clock3 size={16} aria-hidden="true" />Gerenciar disponibilidade</Link>
+      {manageAvailability && <Link className="text-link" href={`/gestao/configuracoes?tab=availability&professional=${professional.id}`}><Clock3 size={16} aria-hidden="true" />Gerenciar disponibilidade</Link>}
       <button type="button" className="text-link" onClick={onBlockTime}><Lock size={16} aria-hidden="true" />Bloquear horário</button>
     </footer>
   </section>;

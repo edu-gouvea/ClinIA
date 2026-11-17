@@ -49,10 +49,11 @@ test('cadastro editado e inativação preservam histórico, revisão futura e fi
   await page.getByRole('button', { name: 'Confirmar inativação', exact: true }).click();
   await expect(page.getByText('Profissional inativo.', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Todos os profissionais', exact: true }).click();
-  await page.getByLabel('Filtrar profissionais ativos').selectOption('inactive');
+  await page.getByRole('button', { name: 'Filtrar por cadastro', exact: true }).click();
+  await page.getByRole('option', { name: 'Inativos', exact: true }).click();
   const table = page.getByRole('region', { name: 'Tabela de profissionais' });
   await expect(table.locator('tbody tr')).toHaveCount(1);
-  await expect(table).toContainText('consulta(s) futura(s) para revisar');
+  await expect(table).toContainText(/consultas? futuras? para revisar/);
   await page.reload(); await expect(table.locator('tbody tr')).toHaveCount(1);
 });
 

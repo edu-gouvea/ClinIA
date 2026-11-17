@@ -2,27 +2,26 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useRef, type KeyboardEvent } from 'react';
-import { ArrowDown, ArrowRight, ArrowUp, Calendar, Check, ChevronDown, ChevronRight, Clock, Info, Plus, X } from 'lucide-react';
-import { Badge, Button, EmptyState, Menu, PageHeading, Popover } from '@/components/ui';
+import { useRef } from 'react';
+import { ArrowDown, ArrowRight, ArrowUp, Calendar, ChevronDown, ChevronRight, Clock, Info } from 'lucide-react';
+import { Badge, Button, EmptyState, Menu, PageHeading } from '@/components/ui';
+import { FilterChip } from '@/components/filter-chip';
 import { KpiStrip, type KpiItem } from '@/components/kpi-strip';
 import { StackedBarChart } from '@/components/stacked-bar-chart';
-import { formatPeriod } from '@/lib/date';
+import { chartSeries, dailyChartData } from '@/lib/appointment-chart';
+import { formatPeriod, monthShortOf, shortPeriod, weekdayOf, weekdaysShort } from '@/lib/date';
+import { formatDecimal, formatRate, plural } from '@/lib/format';
 import { countDelta, formatCountDelta, metricComparison, signedCountDelta } from '@/lib/metric-comparison';
+import { formatMinutes } from '@/lib/attendance-metrics';
 import { managementSorts, type ManagementSort } from '@/lib/management-presentation';
+import { serviceMetrics } from '@/lib/service-analysis';
 import { outcomeBreakdown, previousDailyTotals, professionalActivity, resolveSort, type ActivityRow } from '@/lib/management-analysis';
 import type { DemoState, Metrics, Period } from '@/lib/types';
-import { ProfessionalAvatar } from './agenda/professional-avatar';
-import { chartSeries, dailyChartData, shortPeriod } from './home-operations';
+import { ProfessionalAvatar } from '@/components/professional-avatar';
 
-const ratio = (value: number | null) => value === null ? 'Sem dados' : `${value.toFixed(1).replace('.', ',')}%`;
-const decimal = (value: number) => value.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-const plural = (count: number, one: string, many: string) => `${count.toLocaleString('pt-BR')} ${count === 1 ? one : many}`;
 const periodOptions = [{ value: 1, label: 'Hoje' }, { value: 7, label: 'Últimos 7 dias' }, { value: 30, label: 'Últimos 30 dias' }];
-const weekdaysShort = ['dom.', 'seg.', 'ter.', 'qua.', 'qui.', 'sex.', 'sáb.'];
-const months = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
 /** "seg., 02 nov." */
-const dayDetail = (date: string) => `${weekdaysShort[new Date(`${date}T12:00:00Z`).getUTCDay()]}, ${date.slice(8, 10)} ${months[Number(date.slice(5, 7)) - 1]}`;
+const dayDetail = (date: string) => `${weekdaysShort[weekdayOf(date)].toLowerCase()}., ${date.slice(8, 10)} ${monthShortOf(date)}`;
 type Preference = 'higher' | 'lower' | 'neutral';
 const deltaTone = (current: number, previous: number, preference: Preference) => metricComparison(current, previous, false, preference).tone;
 
@@ -75,8 +74,8 @@ export function ManagementOverview({ state, period, previous, metrics, before, d
   const results = metrics.completed + metrics.missed;
   const kpis: KpiItem[] = [
     { title: 'Consultas realizadas', value: String(metrics.completed), detail: 'Resultados registrados no período', href: agendaHref('realizada'), change: metricComparison(metrics.completed, before.completed, false, 'higher'), reference: String(before.completed) },
-    { title: 'Ocupação da agenda', value: ratio(metrics.occupancy), detail: `${decimal(metrics.bookedMinutes / 60)} h ocupadas de ${decimal(metrics.availableMinutes / 60)} h disponíveis`, href: agendaHref(), change: metricComparison(metrics.occupancy, before.occupancy, true, 'neutral'), reference: ratio(before.occupancy) },
-    { title: 'Taxa de faltas', value: ratio(metrics.absenceRate), detail: `${plural(metrics.missed, 'falta', 'faltas')} em ${plural(results, 'resultado', 'resultados')}`, href: agendaHref('falta'), change: metricComparison(metrics.absenceRate, before.absenceRate, true, 'lower'), reference: ratio(before.absenceRate) },
+    { title: 'Ocupação da agenda', value: formatRate(metrics.occupancy), detail: `${formatDecimal(metrics.bookedMinutes / 60)} h ocupadas de ${formatDecimal(metrics.availableMinutes / 60)} h disponíveis`, href: agendaHref(), change: metricComparison(metrics.occupancy, before.occupancy, true, 'neutral'), reference: formatRate(before.occupancy) },
+    { title: 'Taxa de faltas', value: formatRate(metrics.absenceRate), detail: `${plural(metrics.missed, 'falta', 'faltas')} em ${plural(results, 'resultado', 'resultados')}`, href: agendaHref('falta'), change: metricComparison(metrics.absenceRate, before.absenceRate, true, 'lower'), reference: formatRate(before.absenceRate) },
     { title: 'Canceladas', value: String(metrics.cancelled), detail: metrics.total ? `${(metrics.cancelled / metrics.total * 100).toFixed(1).replace('.', ',')}% das consultas previstas` : 'Sem dados', href: agendaHref('cancelada'), change: metricComparison(metrics.cancelled, before.cancelled, false, 'lower'), reference: String(before.cancelled) },
   ];
 
@@ -96,7 +95,7 @@ export function ManagementOverview({ state, period, previous, metrics, before, d
   const share = (value: number) => outcome.current.total ? Math.round(value / outcome.current.total * 100) : 0;
 
   const filtered = !!(professionalId || specialty);
-  const professionalOptions = [{ id: '', label: 'Todos os profissionais' }, ...state.professionals.map(p => ({ id: p.id, label: p.name, sub: `${p.specialties.join(', ')}${p.active ? '' : ' · Inativo'}`, professional: p }))];
+  const professionalOptions = [{ id: '', label: 'Todos os profissionais' }, ...state.professionals.map(p => ({ id: p.id, label: p.name, sub: `${p.specialties.join(', ')}${p.active ? '' : ' · Inativo'}`, leading: <ProfessionalAvatar professional={p} size={26} /> }))];
   const specialtyOptions = [{ id: '', label: 'Todas as especialidades' }, ...specialties.map(s => ({ id: s, label: s }))];
 
   return <div className="management-overview">
@@ -161,6 +160,8 @@ export function ManagementOverview({ state, period, previous, metrics, before, d
       </section>
     </div>
 
+    <ServiceSection state={state} period={period} previous={previous} />
+
     <section className="card management-professionals" aria-labelledby="management-professionals-title">
       <div className="management-card-head management-professionals-head">
         <div><h2 id="management-professionals-title">Atividade por profissional</h2><p>Disponibilidade já desconta bloqueios. Os números comparam agenda, não qualidade clínica.</p></div>
@@ -199,8 +200,8 @@ function ActivityCells({ row }: { row: Omit<ActivityRow, 'professional'> }) {
   const occupancy = row.ocupacao;
   return <>
     <td className="numeric"><span className="cell-strong">{row.realizadas}</span><small className="activity-delta" data-tone={delta.kind === 'no-base' ? 'neutral' : tone}>{delta.kind === 'no-base' ? `Sem base · anterior: ${row.realizadasAnterior}` : `${formatCountDelta(delta)} vs. ${row.realizadasAnterior}`}{tone !== 'neutral' && delta.kind !== 'no-base' && <span className="sr-only"> · Variação {tone === 'positive' ? 'favorável' : 'desfavorável'}</span>}</small></td>
-    <td className="activity-occupancy"><span className="activity-occupancy-line"><strong>{ratio(occupancy)}</strong><small>{decimal(row.horasOcupadas)} de {decimal(row.horasDisponiveis)} h</small></span><span className="activity-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, occupancy ?? 0))}%` }} /></span></td>
-    <td className="numeric"><span className="cell-strong">{row.faltas}</span><small>{ratio(row.taxaFaltas)}</small></td>
+    <td className="activity-occupancy"><span className="activity-occupancy-line"><strong>{formatRate(occupancy)}</strong><small>{formatDecimal(row.horasOcupadas)} de {formatDecimal(row.horasDisponiveis)} h</small></span><span className="activity-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, occupancy ?? 0))}%` }} /></span></td>
+    <td className="numeric"><span className="cell-strong">{row.faltas}</span><small>{formatRate(row.taxaFaltas)}</small></td>
     <td className="numeric">{row.canceladas}</td>
     <td className="numeric activity-open">{row.emAberto}</td>
   </>;
@@ -220,30 +221,26 @@ function ActivityTableRow({ row, specialty, href, onOpen }: { row: ActivityRow; 
   </tr>;
 }
 
-type ChipOption = { id: string; label: string; sub?: string; professional?: { name: string; color: string } };
-/** Filter chip (Pacientes pattern): dashed when empty, solid with "Nome: valor" and a
- * separate "×" when applied; opens a single-choice list in a `Popover`. */
-function FilterChip({ name, value, valueLabel, options, onChange, removeLabel }: { name: string; value: string; valueLabel: string; options: ChipOption[]; onChange: (value: string) => void; removeLabel: string }) {
-  const applied = !!value;
-  function onKey(event: KeyboardEvent<HTMLDivElement>, close: () => void) {
-    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="option"]'));
-    const index = items.indexOf(document.activeElement as HTMLElement);
-    const target = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: items.length - 1 }[event.key];
-    if (target !== undefined) { event.preventDefault(); items[Math.max(0, Math.min(items.length - 1, target))]?.focus(); return; }
-    if ((event.key === 'Enter' || event.key === ' ') && index >= 0) { event.preventDefault(); onChange(items[index].dataset.value ?? ''); close(); }
-  }
-  return <div className={`recorte-chip-group${applied ? ' is-applied' : ''}`}>
-    <Popover label={`Filtrar por ${name.toLocaleLowerCase('pt-BR')}`} triggerClassName="recorte-chip" className="chip-popover"
-      triggerLabel={applied ? `${name}: ${valueLabel}` : `Filtrar por ${name.toLocaleLowerCase('pt-BR')}`}
-      triggerContent={applied ? <><span className="recorte-chip-prefix">{name}:</span> <span className="recorte-chip-value">{valueLabel}</span></> : <><Plus size={14} aria-hidden="true" />{name}</>}>
-      {close => <div role="listbox" aria-label={name} className="chip-options" onKeyDown={event => onKey(event, close)}>
-        {options.map((option, index) => <div key={option.id || 'all'} role="option" tabIndex={(value ? option.id === value : index === 0) ? 0 : -1} aria-selected={option.id === value} data-value={option.id} className={`chip-option${index === 0 ? ' is-all' : ''}`} onClick={() => { onChange(option.id); close(); }}>
-            <span className="chip-option-check" aria-hidden="true">{option.id === value && <Check size={14} />}</span>
-            {option.professional && <ProfessionalAvatar professional={option.professional} size={26} />}
-            <span className="chip-option-text"><span>{option.label}</span>{option.sub && <small>{option.sub}</small>}</span>
-          </div>)}
-      </div>}
-    </Popover>
-    {applied && <button type="button" className="recorte-chip-remove" aria-label={removeLabel} onClick={() => onChange('')}><X size={14} aria-hidden="true" /></button>}
-  </div>;
+/** The patient channel: how much the AI resolved alone and how fast the reception picked up
+ * what it handed over. Independent of the professional/specialty filters. */
+function ServiceSection({ state, period, previous }: { state: DemoState; period: Period; previous: Period }) {
+  const now = serviceMetrics(state, period);
+  const before = serviceMetrics(state, previous);
+  const waiting = state.conversations.filter(c => c.status === 'aguardando').length;
+  const stats = [
+    { label: 'Sessões no WhatsApp', value: String(now.sessions), detail: `anterior: ${before.sessions}` },
+    { label: 'Resolvidas pela IA', value: formatRate(now.aiShare), detail: `${plural(now.aiOnly, 'sessão', 'sessões')} sem atendente · anterior: ${formatRate(before.aiShare)}` },
+    { label: 'Encaminhadas à recepção', value: String(now.handoffs), detail: `anterior: ${before.handoffs}` },
+    { label: 'Tempo até assumir', value: formatMinutes(now.claimMinutes), detail: now.claimBase ? `média de ${plural(now.claimBase, 'encaminhamento', 'encaminhamentos')}` : 'sem encaminhamentos assumidos' },
+  ];
+  return <section className="card management-service" aria-labelledby="management-service-title">
+    <div className="management-card-head">
+      <div><h2 id="management-service-title">Atendimento no WhatsApp</h2><p>IA e recepção no período · não depende dos filtros de profissional e especialidade</p></div>
+      <Link className="management-link" href="/conversas?view=pendentes">{plural(waiting, 'conversa aguardando', 'conversas aguardando')} agora<ArrowRight size={14} aria-hidden="true" /></Link>
+    </div>
+    <dl className="service-stats">
+      {stats.map(stat => <div key={stat.label}><dt>{stat.label}</dt><dd className="tabular">{stat.value}</dd><dd className="service-detail">{stat.detail}</dd></div>)}
+    </dl>
+    <p className="management-footnote">Uma sessão conta no dia da primeira mensagem. Respostas da IA são simuladas nesta demonstração; tempos por atendente estão em <Link className="text-link" href="/gestao/equipe?tab=atendentes">Equipe › Atendentes</Link>.</p>
+  </section>;
 }

@@ -4,9 +4,10 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, Filter as Funnel, X } fr
 import { Button, Field, Popover, SearchInput } from '@/components/ui';
 import { DateInput } from '@/components/date-time-fields';
 import { addDays } from '@/lib/date';
+import { normalizeText } from '@/lib/format';
 import { formatDayTitle, formatMonthTitle, formatWeekTitle, legacyStatusLabels, type AgendaView } from '@/lib/agenda-presentation';
 import type { DemoState, Professional } from '@/lib/types';
-import { ProfessionalAvatar } from './professional-avatar';
+import { ProfessionalAvatar } from '@/components/professional-avatar';
 
 const monthStart = (date: string) => `${date.slice(0, 8)}01`;
 const addMonths = (date: string, amount: number) => {
@@ -93,11 +94,10 @@ export function ProfessionalPicker({ state, professionalId, open, onOpenChange, 
   const list = useRef<HTMLDivElement>(null);
   const active = state.professionals.filter(p => p.active);
   const selected = state.professionals.find(p => p.id === professionalId);
-  const normalize = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const options: ProfessionalOption[] = [
     { id: '', title: 'Todos os profissionais', sub: `Dia por profissional · ${dayCount} ${dayCount === 1 ? 'consulta' : 'consultas'}` },
     ...active.map(p => ({ id: p.id, title: p.name, sub: `${p.specialties.join(' · ')} · ${todayCount(p.id)} hoje`, professional: p })),
-  ].filter(option => !query || normalize(`${option.title} ${option.sub}`).includes(normalize(query)));
+  ].filter(option => !query || normalizeText(`${option.title} ${option.sub}`).includes(normalizeText(query)));
   const items = () => Array.from(list.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
   function move(event: KeyboardEvent, from: number) {
     const all = items(); let next = -2;

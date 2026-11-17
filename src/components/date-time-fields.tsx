@@ -1,13 +1,13 @@
 'use client';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CalendarDays, Clock3 } from 'lucide-react';
+import { isValidDate } from '@/lib/date';
 
 export function parseDateInput(text: string): string | null {
   const raw = text.trim();
   const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw) || /^(\d{2})(\d{2})(\d{4})$/.exec(raw);
   const iso = parts ? `${parts[3]}-${parts[2]}-${parts[1]}` : raw;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || !Number.isFinite(Date.parse(`${iso}T12:00:00Z`))) return null;
-  return new Date(`${iso}T12:00:00Z`).toISOString().slice(0, 10) === iso ? iso : null;
+  return isValidDate(iso) ? iso : null;
 }
 export function parseTimeInput(text: string): string | null {
   const raw = text.trim();

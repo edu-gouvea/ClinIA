@@ -5,7 +5,7 @@ import { dayMonth, daysBetween, monthYearShort, relativeAgo, clinicDate } from '
 import { rescheduleRequestIds } from '../src/lib/agenda-presentation';
 import {
   appointmentWhen, buildPatientTimeline, filterPatients, lastAppointment, latestConversation, longDayLabel, monthTitle, nextAppointment, paginate,
-  parseOrder, parseSort, parseView, patientAppointmentsSplit, patientNotes, patientPendencies, patientSessions, patientSummary, sortPatients, viewCounts,
+  parseOrder, parseSort, parseView, patientAppointmentsSplit, patientPendencies, patientSessions, patientSummary, sortPatients, viewCounts,
 } from '../src/lib/patient-presentation';
 import type { Appointment, DemoState } from '../src/lib/types';
 
@@ -117,7 +117,7 @@ test('buildPatientTimeline: grupos, ordem, sessões e meses carregados', () => {
   state.appointments = [
     appt('f2', '2026-11-12', '09:00', 'confirmada'),
     appt('f1', '2026-11-09', '11:30', 'agendada'),
-    appt('w1', '2026-11-08', '09:00', 'realizada', { notes: [{ id: 'n1', text: 'v1', professionalId: 'pro-clara', recordedByUserId: 'user-marina', at: '2026-11-08T10:00:00-03:00' }, { id: 'n2', text: 'v2', professionalId: 'pro-clara', recordedByUserId: 'user-marina', at: '2026-11-08T11:00:00-03:00' }] }),
+    appt('w1', '2026-11-08', '09:00', 'realizada'),
     appt('w2', '2026-11-03', '09:00', 'cancelada', { cancelReason: 'Viagem' }),
     appt('m1', '2026-11-01', '09:00', 'realizada'),
     appt('o1', '2026-10-20', '09:00', 'falta'),
@@ -146,8 +146,6 @@ test('buildPatientTimeline: grupos, ordem, sessões e meses carregados', () => {
   }
   const old = timeline.groups[3].items[0];
   assert.ok(old.type === 'conversation' && old.status === 'encerrada' && old.reason === undefined);
-  const noted = timeline.groups[1].items[1];
-  assert.ok(noted.type === 'appointment' && noted.latestNote?.text === 'v2' && noted.latestNote.version === 2 && noted.latestNote.author === 'Dra. Clara Mendes');
   const cancelled = timeline.groups[1].items[2];
   assert.ok(cancelled.type === 'appointment' && cancelled.cancelReason === 'Viagem');
   const more = buildPatientTimeline(state, 'patient-1', NOW, 3);
@@ -195,11 +193,11 @@ test('paginate: 12 por página, limites e posições', () => {
   assert.deepEqual({ ...paginate([], 1), items: undefined }, { items: undefined, page: 1, pages: 1, from: 0, to: 0, total: 0 });
 });
 
-test('consultas próximas/anteriores, anotações, sessões e conversa mais recente', () => {
+test('consultas próximas/anteriores, sessões e conversa mais recente', () => {
   const state = blank();
   state.appointments = [
-    appt('a', '2026-11-01', '09:00', 'realizada', { notes: [{ id: 'n', text: 'Nota A', professionalId: 'pro-clara', recordedByUserId: 'user-marina', at: '2026-11-01T10:00:00-03:00' }] }),
-    appt('b', '2026-11-05', '09:00', 'realizada', { professionalId: 'pro-lucas', notes: [{ id: 'n2', text: 'Nota B', professionalId: 'pro-lucas', recordedByUserId: 'user-marina', at: '2026-11-05T10:00:00-03:00' }] }),
+    appt('a', '2026-11-01', '09:00', 'realizada'),
+    appt('b', '2026-11-05', '09:00', 'realizada', { professionalId: 'pro-lucas' }),
     appt('c', '2026-11-10', '09:00', 'agendada'),
     appt('d', '2026-11-11', '09:00', 'cancelada', { professionalId: 'pro-lucas' }),
   ];
@@ -207,7 +205,6 @@ test('consultas próximas/anteriores, anotações, sessões e conversa mais rece
   assert.deepEqual(split.proximas.map(a => a.id), ['c', 'd']);
   assert.deepEqual(split.anteriores.map(a => a.id), ['b', 'a']);
   assert.deepEqual(patientAppointmentsSplit(state, 'patient-1', 'pro-lucas').proximas.map(a => a.id), ['d']);
-  assert.deepEqual(patientNotes(state, 'patient-1').map(n => [n.appointmentId, n.text, n.version, n.author]), [['b', 'Nota B', 1, 'Dr. Lucas Vieira'], ['a', 'Nota A', 1, 'Dra. Clara Mendes']]);
   const seed = createDemoState('2026-11-09');
   assert.equal(latestConversation(seed, 'patient-1')?.id, 'conversation-1');
   assert.equal(latestConversation(seed, 'patient-24'), undefined);

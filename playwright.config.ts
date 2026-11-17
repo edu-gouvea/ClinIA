@@ -21,6 +21,14 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  // Tests use isolated browser contexts. The development or production server
-  // is started separately, so an existing application process is never killed.
+  // Tests use isolated browser contexts. With `CLINIA_BASE_URL` the suite targets a
+  // server you started yourself. Otherwise Playwright reuses whatever already answers
+  // on port 3000 and only builds and starts a production server when nothing does;
+  // it stops only the server it started, never an existing process.
+  webServer: process.env.CLINIA_BASE_URL ? undefined : {
+    command: 'npm run build && npm run start',
+    url: 'http://localhost:3000/inicio',
+    reuseExistingServer: true,
+    timeout: 240_000,
+  },
 });

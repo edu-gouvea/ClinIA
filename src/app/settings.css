@@ -1,0 +1,58 @@
+/* Configurações and the weekly hours editor. Tokens only; breakpoints from lib/breakpoints. */
+.settings-page > .page-heading { margin: 0; }
+.settings-tabs [role="tab"] svg { color: var(--subtle); }
+.settings-tabs [role="tab"][aria-selected="true"] svg { color: var(--ink); }
+
+.settings-card { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); }
+.settings-card > .card-header { margin-bottom: 0; }
+.settings-card-head { align-items: flex-start; flex-wrap: wrap; }
+.settings-card-head .field { min-width: 220px; }
+.settings-note { display: flex; align-items: center; gap: var(--space-2); margin: 0; font: var(--type-caption); color: var(--muted); }
+.settings-submit { display: flex; justify-content: flex-end; }
+.settings-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.settings-blocks td strong { display: block; font-weight: 500; }
+.settings-blocks td small { display: block; margin-top: 2px; font: var(--type-caption); color: var(--muted); }
+.settings-row-actions { justify-content: flex-end; flex-wrap: nowrap; }
+.conflict-notice ul { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+.conflict-notice .text-link { color: inherit; text-decoration: underline; text-underline-offset: 4px; }
+
+/* Weekly hours editor (components/hours-editor.tsx) */
+.hours-editor { overflow-x: auto; }
+.hours-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 300px; padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.hours-row:first-child { border-top: 0; padding-top: 0; }
+.hours-day { flex: none; width: 116px; font: var(--type-body-sm); font-weight: 500; }
+.hours-slots { display: flex; flex: 1 1 0; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
+.hours-slot { display: flex; align-items: center; gap: var(--space-2); }
+.hours-separator, .hours-closed { font: var(--type-caption); color: var(--muted); }
+.hours-remove { color: var(--muted); }
+.hours-remove:hover:not(:disabled) { background: var(--danger-bg); color: var(--danger-ink); }
+.hours-add { gap: var(--space-1); color: var(--green-ink); font: var(--type-caption); font-weight: 500; }
+
+/* Base de conhecimento */
+.knowledge-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.knowledge-count { font: var(--type-caption); color: var(--muted); }
+.knowledge-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.knowledge-card { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4); }
+.knowledge-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.knowledge-card h3 { font: var(--type-title-sm); }
+.knowledge-card p { margin: 0; font: var(--type-body-sm); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.knowledge-actions .btn { min-height: 28px; padding: 0 var(--space-2); font: var(--type-body-sm); font-weight: 500; }
+.knowledge-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); margin-top: auto; padding-top: var(--space-3); border-top: 1px solid var(--border); }
+
+/* Ferramentas da demonstração */
+.demo-tools summary { cursor: pointer; font: var(--type-body-sm); font-weight: 500; color: var(--muted); }
+.demo-tools-body { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-5); margin-top: var(--space-4); }
+.demo-tools-body > div:first-child { max-width: 560px; display: flex; flex-direction: column; gap: var(--space-2); }
+.demo-tools-body p { margin: 0; font: var(--type-body-sm); color: var(--muted); }
+
+@media (max-width: 767px) {
+  .knowledge-grid { grid-template-columns: minmax(0, 1fr); }
+  .settings-card { padding: var(--space-4); }
+  .settings-card-head .field { flex: 1 1 100%; }
+  /* The weekday gets its own line so start, end and remove fit without side scrolling. */
+  .hours-row { min-width: 0; gap: var(--space-2); }
+  .hours-day { width: 100%; }
+  .hours-slots { flex: 1 1 100%; }
+  .hours-slot .hours-input { width: 112px; min-width: 0; }
+  .hours-add { margin-left: auto; }
+}

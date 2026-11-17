@@ -1,4 +1,4 @@
-import { clinicDate, dateTime, monthYearShort } from './date';
+import { clinicDate, dateTime, monthShortOf, monthYearShort, weekdayOf, weekdaysLong } from './date';
 import { isReschedule } from './conversation-inbox';
 import { relativeDay, rescheduleTarget } from './conversation-assistant';
 import { isOpenAppointment } from './scheduling';
@@ -78,25 +78,17 @@ export function patientSummary(state: DemoState, patientId: string): PatientSumm
   };
 }
 
-export type LatestNote = { text: string; author: string; version: number; at: string };
-export type AppointmentItem = { type: 'appointment'; id: string; start: string; date: string; time: string; duration: number; status: AppointmentStatus; professional: string; professionalId: string; specialty: string; cancelReason?: string; latestNote?: LatestNote };
+export type AppointmentItem = { type: 'appointment'; id: string; start: string; date: string; time: string; duration: number; status: AppointmentStatus; professional: string; professionalId: string; specialty: string; cancelReason?: string };
 export type ConversationItem = { type: 'conversation'; id: string; conversationId: string; sessionId: string; sessionNumber: number; at: string; status: ConversationStatus; assignee: string | null; reason?: string; messageCount: number; preview: string };
 export type TimelineItem = AppointmentItem | ConversationItem;
 export type TimelineGroup = { id: string; title: string; items: TimelineItem[] };
 export type PatientTimeline = { groups: TimelineGroup[]; nextMonth: string | null };
-
-function latestNote(state: DemoState, appointment: Appointment): LatestNote | undefined {
-  const note = appointment.notes?.at(-1);
-  if (!note) return undefined;
-  return { text: note.text, author: state.professionals.find(p => p.id === note.professionalId)?.name ?? state.users.find(u => u.id === note.recordedByUserId)?.name ?? 'Equipe', version: appointment.notes!.length, at: note.at };
-}
 
 export function appointmentItem(state: DemoState, appointment: Appointment): AppointmentItem {
   return {
     type: 'appointment', id: appointment.id, start: dateTime(appointment.date, appointment.start), date: appointment.date, time: appointment.start, duration: appointment.duration,
     status: appointment.status, professionalId: appointment.professionalId, professional: state.professionals.find(p => p.id === appointment.professionalId)?.name ?? 'Profissional removido',
     specialty: appointment.specialty, cancelReason: appointment.status === 'cancelada' && appointment.cancelReason && appointment.cancelReason !== 'Motivo não informado.' ? appointment.cancelReason : undefined,
-    latestNote: latestNote(state, appointment),
   };
 }
 
@@ -221,10 +213,8 @@ export function paginate<T>(rows: T[], page: number, size = 12): Page<T> {
 
 /** "Hoje · 11:30", "Amanhã · 14:00", "Qui, 12 nov. · 09:00". */
 export const appointmentWhen = (date: string, start: string, referenceDate: string) => `${relativeDay(date, referenceDate)} · ${start}`;
-const weekdaysLong = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-const months = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
 /** "Terça, 10 de nov." */
-export const longDayLabel = (date: string) => `${weekdaysLong[new Date(`${date}T12:00:00Z`).getUTCDay()]}, ${Number(date.slice(8, 10))} de ${months[Number(date.slice(5, 7)) - 1]}`;
+export const longDayLabel = (date: string) => `${weekdaysLong[weekdayOf(date)]}, ${Number(date.slice(8, 10))} de ${monthShortOf(date)}`;
 
 /** Upcoming (from `state.now`, ascending) and earlier (descending) appointments,
  * optionally for one professional. */
@@ -232,15 +222,6 @@ export function patientAppointmentsSplit(state: DemoState, patientId: string, pr
   const now = Date.parse(state.now);
   const list = ofPatient(state, patientId).filter(a => !professionalId || a.professionalId === professionalId);
   return { proximas: list.filter(a => startOf(a) >= now).sort(byStart), anteriores: list.filter(a => startOf(a) < now).sort((a, b) => byStart(b, a)) };
-}
-
-export type PatientNote = { appointmentId: string; text: string; author: string; at: string; version: number; specialty: string; date: string };
-/** Latest version of every consultation note of the patient, most recent first. */
-export function patientNotes(state: DemoState, patientId: string): PatientNote[] {
-  return ofPatient(state, patientId).flatMap(a => {
-    const note = latestNote(state, a);
-    return note ? [{ appointmentId: a.id, text: note.text, author: note.author, at: note.at, version: note.version, specialty: a.specialty, date: a.date }] : [];
-  }).sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || b.appointmentId.localeCompare(a.appointmentId));
 }
 
 /** The patient's conversation with the most recent activity. */

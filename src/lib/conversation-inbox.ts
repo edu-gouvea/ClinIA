@@ -1,4 +1,5 @@
-import { addDays, CLINIC_TIMEZONE } from './date';
+import { addDays, clinicTimeZone } from './date';
+import { normalizeText } from './format';
 import type { Conversation, ConversationStatus, DemoState, Message } from './types';
 
 /** Inbox presentation helpers. Pure: no mutation, no clock other than `state.now`. */
@@ -16,8 +17,7 @@ export type InboxFilters = {
   reason: '' | 'remarcacao';
 };
 
-const normalize = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-export const isReschedule = (conversation: Conversation) => /remarc/.test(normalize(conversation.reason || ''));
+export const isReschedule = (conversation: Conversation) => /remarc/.test(normalizeText(conversation.reason || ''));
 export const viewOf = (status: ConversationStatus): InboxView => status === 'aguardando' ? 'pendentes' : status === 'encerrada' ? 'finalizadas' : 'atendimento';
 
 /** Maps current and legacy query strings onto one inbox state.
@@ -95,8 +95,8 @@ export function previewPrefix(message: Message | undefined, state: Pick<DemoStat
   return user ? `${firstName(user.name)}: ` : 'Atendente: ';
 }
 
-const dayKey = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: CLINIC_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
-const time = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: CLINIC_TIMEZONE, hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+const dayKey = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: clinicTimeZone(), year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+const time = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: clinicTimeZone(), hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
 /** "hoje às 09:39", "ontem às 18:00", "em 05/11 às 10:00". */
 export function relativeMoment(iso: string, referenceDate: string): string {

@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, Clock3, Repeat, SlidersHorizontal, Sparkles, X } from 'lucide-react';
-import { useRef, type KeyboardEvent } from 'react';
+import { Tabs } from '@/components/tabs';
 import { Avatar, Badge, SearchInput } from '@/components/ui';
 import { formatTime } from '@/lib/date';
 import {
@@ -24,23 +24,12 @@ const emptyCopy: Record<InboxView, [string, string]> = {
 };
 
 export function Inbox({ state, filters, counts, conversations, selectedId, search, onSearch, filtersOpen, onToggleFilters, onView, onFilter, onSelect }: Props) {
-  const tabs = useRef<HTMLDivElement>(null);
   const others = state.users.filter(user => user.id !== state.currentUserId);
   const assigneeName = filters.assignee === 'me' ? 'Comigo' : filters.assignee === 'other' ? 'Outro atendente' : state.users.find(user => user.id === filters.assignee)?.name;
   // Filters set from the panel stay visible as removable chips even with the panel closed.
   const panelFilters: { key: string; label: string; clear: Record<string, null> }[] = [];
   if (filters.reason === 'remarcacao') panelFilters.push({ key: 'reason', label: 'Remarcação', clear: { reason: null } });
   if (filters.assignee && !(filters.view === 'atendimento' && filters.assignee === 'me')) panelFilters.push({ key: 'assignee', label: `Responsável: ${assigneeName ?? filters.assignee}`, clear: { assignee: null } });
-
-  function onTabKey(event: KeyboardEvent<HTMLButtonElement>) {
-    const index = inboxViews.indexOf(filters.view);
-    const next = event.key === 'ArrowRight' ? index + 1 : event.key === 'ArrowLeft' ? index - 1 : event.key === 'Home' ? 0 : event.key === 'End' ? inboxViews.length - 1 : null;
-    if (next === null) return;
-    event.preventDefault();
-    const view = inboxViews[(next + inboxViews.length) % inboxViews.length];
-    onView(view);
-    requestAnimationFrame(() => tabs.current?.querySelector<HTMLButtonElement>(`[data-view="${view}"]`)?.focus());
-  }
 
   return <aside aria-label="Lista de conversas" className="inbox">
     <div className="inbox-top">
@@ -49,15 +38,11 @@ export function Inbox({ state, filters, counts, conversations, selectedId, searc
         <button type="button" className="btn btn-ghost btn-icon inbox-filter-toggle" aria-label="Filtros: motivo e responsável" title="Filtros: motivo e responsável" aria-expanded={filtersOpen} aria-controls="inbox-filters" data-active={panelFilters.length > 0 || undefined} onClick={onToggleFilters}><SlidersHorizontal size={16} /></button>
       </div>
       <SearchInput aria-label="Buscar conversas por nome ou telefone" placeholder="Nome ou telefone" value={search} onChange={event => onSearch(event.target.value)} />
-      <div ref={tabs} className="inbox-tabs" role="tablist" aria-label="Situação das conversas">
-        {inboxViews.map(view => {
-          const selected = filters.view === view;
-          return <button key={view} type="button" role="tab" id={`inbox-tab-${view}`} data-view={view} aria-selected={selected} aria-controls="inbox-list" tabIndex={selected ? 0 : -1}
-            aria-label={`${inboxViewLabels[view]}, ${counts[view]}`} onClick={() => onView(view)} onKeyDown={onTabKey}>
-            <span>{inboxViewLabels[view]}</span>{view === 'pendentes' && counts.pendentes > 0 && <span className="inbox-count tabular" aria-hidden="true">{counts.pendentes}</span>}
-          </button>;
-        })}
-      </div>
+      <Tabs idPrefix="inbox" label="Situação das conversas" className="inbox-tabs" panelId="inbox-list" value={filters.view} onChange={onView}
+        items={inboxViews.map(view => ({
+          key: view, ariaLabel: `${inboxViewLabels[view]}, ${counts[view]}`,
+          label: <><span>{inboxViewLabels[view]}</span>{view === 'pendentes' && counts.pendentes > 0 && <span className="inbox-count tabular" aria-hidden="true">{counts.pendentes}</span>}</>,
+        }))} />
       {filters.view === 'atendimento' && <div className="inbox-chips" role="group" aria-label="Filtrar em atendimento">
         <button type="button" className="chip" aria-pressed={!filters.status && filters.assignee !== 'me'} onClick={() => onFilter({ status: null, assignee: filters.assignee === 'me' ? null : filters.assignee || null })}>Todas <span className="tabular">{counts.atendimento}</span></button>
         <button type="button" className="chip" aria-pressed={filters.assignee === 'me' && !filters.status} onClick={() => onFilter({ assignee: 'me', status: null })}>Comigo <span className="tabular">{counts.mine}</span></button>

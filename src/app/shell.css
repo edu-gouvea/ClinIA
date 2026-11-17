@@ -326,3 +326,8 @@
   /* In the column layout flex-grow would override the fixed height. */
   .app-main-conversations { --conversation-shell-header: 52px; flex: none; }
 }
+
+/* Profile dialog: demo identity switch */
+.profile-switch { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-4) 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.profile-switch legend { padding: 0 var(--space-1); font: var(--type-body-sm); font-weight: 500; color: var(--muted); }
+.profile-switch small { font: var(--type-caption); }

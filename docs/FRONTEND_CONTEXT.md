@@ -1,5 +1,7 @@
 # FRONTEND_CONTEXT — ClinIA
 
+> **Documento histórico (13/11/2026), anterior ao redesenho.** Descreve a interface antiga (barra superior, Tailwind em Configurações, anotações de consulta, `DemoValidationError`). O estado atual está no [README](../README.md), em [DECISOES.md](DECISOES.md), [INTEGRACAO.md](INTEGRACAO.md) e [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md). Mantido como registro da auditoria.
+
 > Documento de contexto para consultoria de UI/UX e planejamento de redesign.
 > Gerado a partir da leitura integral do código-fonte em `src/`, dos testes em `tests/` e dos arquivos de configuração (13/11/2026).
 > Nenhum código foi alterado.

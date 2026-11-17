@@ -1,25 +1,26 @@
 'use client';
 
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, CalendarPlus, Check, CreditCard, FileText, MessageCircle, Pencil, Phone } from 'lucide-react';
 import { useDemo } from '@/components/demo-provider';
+import { Tabs, tabPanelProps } from '@/components/tabs';
 import { Avatar, Button, useIsNarrow } from '@/components/ui';
 import { dayMonth } from '@/lib/date';
 import { relativeDay } from '@/lib/conversation-assistant';
-import { latestConversation, patientNotes, patientPendencies, patientSessions, patientSummary, type Pendency } from '@/lib/patient-presentation';
+import { latestConversation, patientPendencies, patientSessions, patientSummary, type Pendency } from '@/lib/patient-presentation';
 import { appointmentStatusLabels } from '@/lib/status-presentation';
 import type { Patient } from '@/lib/types';
 import { AppointmentDetails } from '../agenda/appointment-details';
-import { ProfessionalAvatar } from '../agenda/professional-avatar';
+import { ProfessionalAvatar } from '@/components/professional-avatar';
 import { PatientActivity, type PatientLinks } from './patient-activity';
-import { PatientAppointmentsTab, PatientConversationsTab, PatientNotesTab } from './patient-tabs';
+import { PatientAppointmentsTab, PatientConversationsTab } from './patient-tabs';
 import { listHref, pendencyIcons, plural } from './shared';
 
-type Tab = 'atividade' | 'consultas' | 'conversas' | 'anotacoes';
-const tabs: Tab[] = ['atividade', 'consultas', 'conversas', 'anotacoes'];
-const tabLabels: Record<Tab, string> = { atividade: 'Atividade', consultas: 'Consultas', conversas: 'Conversas', anotacoes: 'Anotações' };
+type Tab = 'atividade' | 'consultas' | 'conversas';
+const tabs: Tab[] = ['atividade', 'consultas', 'conversas'];
+const tabLabels: Record<Tab, string> = { atividade: 'Atividade', consultas: 'Consultas', conversas: 'Conversas' };
 const isParticular = (insurance: string) => !insurance.trim() || /^particular$/i.test(insurance.trim());
 
 export function PatientDetail({ patient, onEdit }: { patient: Patient; onEdit: () => void }) {
@@ -38,7 +39,6 @@ export function PatientDetail({ patient, onEdit }: { patient: Patient; onEdit: (
     atividade: null,
     consultas: state.appointments.filter(a => a.patientId === patient.id).length,
     conversas: patientSessions(state, patient.id).length,
-    anotacoes: patientNotes(state, patient.id).length,
   };
   const detail = state.appointments.find(a => a.id === params.get('appointment') && a.patientId === patient.id);
 
@@ -53,15 +53,8 @@ export function PatientDetail({ patient, onEdit }: { patient: Patient; onEdit: (
   };
   const links: PatientLinks = { details: id => href({ appointment: id }), reschedule, schedule: `/gestao/agenda?new=1&patient=${patient.id}${contextQuery}` };
 
-  function selectTab(next: Tab, focus = false) {
+  function selectTab(next: Tab) {
     router.replace(href({ tab: next === 'atividade' ? null : next, page: null, when: null, professional: null }), { scroll: false });
-    if (focus) requestAnimationFrame(() => document.getElementById(`patient-tab-${next}`)?.focus());
-  }
-  function onTabKey(event: KeyboardEvent<HTMLButtonElement>) {
-    const index = tabs.indexOf(tab);
-    const target = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
-    if (target < 0) return;
-    event.preventDefault(); selectTab(tabs[target], true);
   }
   async function confirm(id: string) {
     setBusy(true); setFeedback({});
@@ -111,16 +104,12 @@ export function PatientDetail({ patient, onEdit }: { patient: Patient; onEdit: (
         {section('patient-resumo', 'Resumo', resumo)}
       </aside>
       <section className="patient-card patient-content" aria-label="Histórico do paciente">
-        <div className="patient-tabs" role="tablist" aria-label="Histórico do paciente">
-          {tabs.map(key => <button key={key} id={`patient-tab-${key}`} type="button" role="tab" aria-selected={tab === key} aria-controls={`patient-panel-${key}`} tabIndex={tab === key ? 0 : -1} onClick={() => selectTab(key)} onKeyDown={onTabKey}>
-            {tabLabels[key]}{counts[key] !== null && <span className="tab-count tabular">{counts[key]}</span>}
-          </button>)}
-        </div>
-        <div id={`patient-panel-${tab}`} role="tabpanel" aria-labelledby={`patient-tab-${tab}`} className={`patient-panel panel-${tab}`}>
+        <Tabs idPrefix="patient" label="Histórico do paciente" className="patient-tabs" value={tab} onChange={selectTab}
+          items={tabs.map(key => ({ key, label: <>{tabLabels[key]}{counts[key] !== null && <span className="tab-count tabular">{counts[key]}</span>}</> }))} />
+        <div {...tabPanelProps('patient', tab)} className={`patient-panel panel-${tab}`}>
           {tab === 'atividade' && <PatientActivity patientId={patient.id} links={links} />}
           {tab === 'consultas' && <PatientAppointmentsTab patientId={patient.id} links={links} context={contextQuery} />}
           {tab === 'conversas' && <PatientConversationsTab patientId={patient.id} />}
-          {tab === 'anotacoes' && <PatientNotesTab patientId={patient.id} links={links} />}
         </div>
       </section>
     </div>

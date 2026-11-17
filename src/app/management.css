@@ -11,29 +11,9 @@
 .management-interval { margin: 0; font-size: 13px; line-height: 20px; color: var(--muted); white-space: nowrap; }
 .management-interval-ref { color: var(--subtle); }
 .management-divider { width: 1px; height: 20px; background: var(--border); flex: none; }
-.management-chips { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.management-chips { --chip-height: 28px; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .management-spacer { flex: 1 1 0; }
 .management-clear { white-space: nowrap; }
-
-.recorte-chip-group { display: inline-flex; align-items: stretch; flex: none; height: 28px; border-radius: 6px; }
-.recorte-chip-group .popover-anchor { display: flex; }
-.recorte-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px dashed var(--border-strong); border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; white-space: nowrap; transition: background-color 120ms ease, color 120ms ease; }
-.recorte-chip:hover { background: var(--surface-hover); color: var(--ink); }
-.recorte-chip-group.is-applied .recorte-chip { border-style: solid; border-color: var(--border-strong); border-right: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); background: var(--surface); color: var(--ink); }
-.recorte-chip-prefix { color: var(--subtle); font-weight: 400; }
-.recorte-chip-value { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
-.recorte-chip-remove { display: grid; place-items: center; width: 30px; border: 1px solid var(--border-strong); border-left-color: var(--border); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface); color: var(--muted); }
-.recorte-chip-remove:hover { background: var(--surface-hover); color: var(--ink); }
-.chip-popover { min-width: 264px; padding: 4px; }
-.chip-options { display: flex; flex-direction: column; }
-.chip-option { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 8px; border-radius: 6px; color: var(--ink); font-size: 13px; cursor: pointer; }
-.chip-option:hover, .chip-option:focus-visible { background: var(--surface-hover); }
-.chip-option[aria-selected="true"] { background: var(--surface-selected); font-weight: 500; }
-.chip-option.is-all { position: relative; margin-bottom: 5px; }
-.chip-option.is-all::before { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; border-top: 1px solid var(--border); }
-.chip-option-check { display: inline-grid; place-items: center; width: 14px; flex: none; color: var(--green-ink); }
-.chip-option-text { display: flex; flex-direction: column; min-width: 0; }
-.chip-option-text small { font-size: 12px; line-height: 16px; color: var(--subtle); font-weight: 400; }
 
 /* Pending results notice */
 .management-pending { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px 10px 14px; border: 1px solid var(--warning-border); border-radius: 10px; background: var(--warning-bg); color: var(--ink); }
@@ -144,11 +124,20 @@ th.is-sorted .management-sort svg, .management-sort:hover svg, .management-sort:
   .management-divider, .management-spacer { display: none; }
   .management-chips { order: 2; flex: 1 1 100%; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
   .management-info { order: 1; }
-  .management-bar .btn, .recorte-chip, .recorte-chip-group, .recorte-chip-remove { min-height: 44px; height: 44px; }
+  .management-bar .btn { min-height: 44px; height: 44px; }
   .management-info { width: 44px; }
   .management-pending-action { height: 44px; min-height: 44px; }
   .management-overview .card { padding: 16px; }
   .management-card-head { flex-wrap: wrap; }
   .management-professionals-head { padding: 16px; }
-  .chip-option { min-height: 44px; }
 }
+
+/* Atendimento no WhatsApp */
+.management-service { display: flex; flex-direction: column; gap: var(--space-4); }
+.management-service .management-card-head { margin: 0; }
+.service-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
+.service-stats > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-left: var(--space-3); border-left: 2px solid var(--ai); }
+.service-stats dt { font: var(--type-body-sm); color: var(--muted); }
+.service-stats dd { margin: 0; font: var(--type-page); letter-spacing: var(--type-page-tracking); color: var(--ink); }
+.service-stats dd.service-detail { font: var(--type-caption); letter-spacing: 0; color: var(--subtle); }
+@media (max-width: 1023px) { .service-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

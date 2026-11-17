@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Calendar, CalendarPlus, Check, ChevronDown, FileText, Filter, MessageCircle, X, XCircle } from 'lucide-react';
+import { ArrowUpRight, Calendar, CalendarPlus, Check, ChevronDown, Filter, MessageCircle, X, XCircle } from 'lucide-react';
 import { useDemo } from '@/components/demo-provider';
 import { Badge, EmptyState, Menu } from '@/components/ui';
 import { clinicDate } from '@/lib/date';
@@ -123,10 +123,6 @@ function TimelineEntry({ item, upcoming, links }: { item: TimelineItem; upcoming
         {when}
       </Link>
       {item.cancelReason && <p className="timeline-reason">Motivo: “{item.cancelReason}”</p>}
-      {item.latestNote && <Link className="activity-card note-card" href={links.details(item.id)} scroll={false}>
-        <FileText size={14} aria-hidden="true" />
-        <span><span className="activity-preview">{item.latestNote.text}</span><span className="activity-meta">Anotação de {item.latestNote.author} · versão {item.latestNote.version}</span></span>
-      </Link>}
     </div>
   </li>;
 }

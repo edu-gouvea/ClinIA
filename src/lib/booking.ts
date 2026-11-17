@@ -1,4 +1,4 @@
-import { addDays, minutes, timeFromMinutes } from './date';
+import { addDays, minutes, monthsLong, timeFromMinutes, weekdayOf, weekdaysLong } from './date';
 import { getFreeSlots } from './metrics';
 import { longDayLabel } from './patient-presentation';
 import type { StatusTone } from './status-presentation';
@@ -44,11 +44,9 @@ export function appointmentSummaryLine({ date, start, duration, professional, sp
   return [longDayLabel(date), `${start}–${end}`, professional, specialty].filter(Boolean).join(' · ');
 }
 
-const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-const months = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 /** "Quinta, 29 de outubro · 16:00–16:30" */
 export function appointmentDayLine({ date, start, duration }: { date: string; start: string; duration: number }): string {
-  return `${weekdays[new Date(`${date}T12:00:00Z`).getUTCDay()]}, ${Number(date.slice(8, 10))} de ${months[Number(date.slice(5, 7)) - 1]} · ${start}–${timeFromMinutes(minutes(start) + duration)}`;
+  return `${weekdaysLong[weekdayOf(date)]}, ${Number(date.slice(8, 10))} de ${monthsLong[Number(date.slice(5, 7)) - 1]} · ${start}–${timeFromMinutes(minutes(start) + duration)}`;
 }
 
 /** The duration options the form has always offered, plus the current value. */
@@ -64,7 +62,6 @@ export function appointmentEventLine(event: AdminEvent): { action: string; tone:
     case 'appointment.realizada': return { action: 'marcou como realizada', tone: 'success' };
     case 'appointment.falta': return { action: 'registrou falta', tone: 'danger' };
     case 'appointment.cancelada': return { action: 'cancelou a consulta', tone: 'neutral' };
-    case 'appointment.note': return { action: 'salvou uma anotação', tone: 'success' };
     default: return { action: event.description, tone: 'neutral' };
   }
 }

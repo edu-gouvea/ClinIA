@@ -1,6 +1,6 @@
 'use client';
 import type { CSSProperties } from 'react';
-import { Avatar } from '@/components/ui';
+import { Avatar } from './ui';
 import { professionalAvatarColors } from '@/lib/agenda-presentation';
 import type { Professional } from '@/lib/types';
 

@@ -4,7 +4,6 @@
 .team-list > .toolbar { padding: 0; border: 0; background: none; }
 .team-roster { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .team-filters,.team-list-controls,.team-view-controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
-.team-filters .search-input { flex: 1; }
 .team-filters > select { max-width: 260px; }
 .team-list-controls { justify-content: space-between; }
 .team-list-controls > p { color: var(--muted); font-size: var(--text-xs); }
@@ -51,3 +50,10 @@
   .team-view-controls .segmented { margin-left: auto; }
   .team-pagination { align-items: flex-start; }
 }
+
+/* Professional detail: same KPI strip and chart as Início / Visão gerencial */
+.team-detail .detail-grid { align-items: start; }
+.team-chart { display: flex; flex-direction: column; gap: var(--space-3); }
+.team-chart > .card-header { margin-bottom: 0; }
+.team-chart-note { margin: 0; font: var(--type-caption); color: var(--subtle); }
+@media (max-width: 1279px) { .team-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

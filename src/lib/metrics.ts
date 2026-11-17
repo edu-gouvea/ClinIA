@@ -1,4 +1,4 @@
-import { addDays, dateTime, minutes, timeFromMinutes } from './date';
+import { addDays, dateTime, isValidDate, minutes, timeFromMinutes } from './date';
 import type { DemoState, Metrics, Period } from './types';
 
 export function getPeriod(referenceDate: string, days = 7): Period {
@@ -66,8 +66,7 @@ export function getFreeSlots(state: DemoState, professionalId: string, date: str
  * Absence = explicit misses / (explicit completed + misses); unreported outcomes do not count.
  * Rates are percentages (0–100), null means no denominator, zero is an observed zero. */
 export function getMetrics(state: DemoState, period: Period, professionalId?: string, specialty?: string): Metrics {
-  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(new Date(`${value}T12:00:00Z`).getTime()) && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
-  const validPeriod = validDate(period.start) && validDate(period.end) && period.start <= period.end;
+  const validPeriod = isValidDate(period.start) && isValidDate(period.end) && period.start <= period.end;
   const professionals = state.professionals.filter((professional) => (!professionalId || professional.id === professionalId) && (!specialty || professional.specialties.includes(specialty) || state.appointments.some((appointment) => appointment.professionalId === professional.id && appointment.specialty === specialty && appointment.date >= period.start && appointment.date <= period.end)));
   const professionalIds = new Set(professionals.map((professional) => professional.id));
   const appointments = state.appointments.filter((appointment) => validPeriod && appointment.date >= period.start && appointment.date <= period.end && professionalIds.has(appointment.professionalId) && (!specialty || appointment.specialty === specialty));

@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDemoState } from '../src/lib/demo-data';
 import { runCommand } from '../src/lib/services';
-import { agendaProfessionals, agendaView, calendarBounds, calendarColumns, CALENDAR_AXIS_WIDTH, CALENDAR_CLOSED_COLUMN_WIDTH, CALENDAR_MIN_COLUMN_WIDTH, canRecordOutcome, getBlockConflicts, layoutAppointments } from '../src/lib/scheduling';
+import { agendaProfessionals, calendarBounds, calendarColumns, CALENDAR_AXIS_WIDTH, CALENDAR_CLOSED_COLUMN_WIDTH, CALENDAR_MIN_COLUMN_WIDTH, canRecordOutcome, getBlockConflicts, layoutAppointments } from '../src/lib/scheduling';
 import { parseDateInput, parseTimeInput } from '../src/components/date-time-fields';
-import { isDemoState } from '../src/lib/state-validation';
-import type { Appointment, AppointmentInput } from '../src/lib/types';
+import { isDemoState, upgradeStoredState } from '../src/lib/state-validation';
+import type { Appointment, AppointmentInput, DemoState } from '../src/lib/types';
 Object.assign(process.env, { NODE_ENV: 'test' });
 const seed = () => createDemoState('2026-11-09');
 const input = (override: Partial<AppointmentInput> = {}): AppointmentInput => ({ patientId: 'patient-1', professionalId: 'pro-clara', specialty: 'Cardiologia', date: '2026-11-10', start: '10:00', duration: 30, status: 'agendada', ...override });
@@ -38,19 +38,16 @@ test('all of today is recordable, tomorrow is blocked and unresolved past appoin
   }
 });
 
-test('consultation notes only follow completion and retain prior versions, author and persisted schema', async () => {
-  let state = seed(); state.appointments = [{ ...event('notes', '14:00', 30), date: state.referenceDate }];
-  await assert.rejects(runCommand(state, { type: 'appointment.note', id: 'notes', text: 'Nota fictícia.' }), /após registrar a realização/);
-  state = await runCommand(state, { type: 'appointment.status', id: 'notes', status: 'realizada' });
-  state = await runCommand(state, { type: 'appointment.note', id: 'notes', text: 'Primeira anotação fictícia.' });
-  state = await runCommand(state, { type: 'appointment.note', id: 'notes', text: 'Segunda anotação fictícia.' });
-  const notes = state.appointments[0].notes!;
-  assert.equal(notes.length, 2); assert.equal(notes[0].text, 'Primeira anotação fictícia.');
-  assert.equal(notes[1].professionalId, 'pro-clara'); assert.equal(notes[1].recordedByUserId, state.currentUserId);
-  assert.equal(isDemoState(JSON.parse(JSON.stringify(state))), true);
-  const repeated = await runCommand(state, { type: 'appointment.note', id: 'notes', text: notes[1].text });
-  assert.equal(repeated.appointments[0].notes?.length, 2);
-  await assert.rejects(runCommand(state, { type: 'appointment.note', id: 'notes', text: '  ' }), /Escreva uma anotação/);
+test('consultation notes are retired: no command exists and stored notes are dropped on load', () => {
+  // ClinIA is administrative: free clinical text is not part of the data model (docs/DECISOES.md).
+  const state = seed() as DemoState & { appointments: (DemoState['appointments'][number] & { notes?: unknown })[] };
+  state.appointments[0].notes = [{ id: 'n', text: 'Texto clínico antigo', professionalId: 'pro-clara', recordedByUserId: state.currentUserId, at: state.now }];
+  const stored = JSON.parse(JSON.stringify(state));
+  assert.equal(isDemoState(stored), true, 'an older save still loads');
+  assert.equal(upgradeStoredState(stored), true);
+  assert.equal('notes' in stored.appointments[0], false);
+  assert.equal(upgradeStoredState(stored), false, 'nothing left to drop');
+  assert.ok(!JSON.stringify(stored).includes('Texto clínico antigo'));
 });
 
 test('block conflicts can be cancelled/rescheduled before final service revalidation', async () => {
@@ -96,10 +93,6 @@ test('typed dates/hours accept pasted ISO, Brazilian separators and unmasked num
   assert.equal(parseTimeInput('12:75'), null);
 });
 
-test('agenda mode is determined exclusively by professional selection', () => {
-  assert.equal(agendaView(''), 'day');
-  assert.equal(agendaView('pro-clara'), 'week');
-});
 
 test('general calendar separates simultaneous professionals and partitions overlapping records within each professional', () => {
   const state = seed();

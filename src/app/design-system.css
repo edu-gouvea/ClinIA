@@ -597,7 +597,7 @@ input[readonly],textarea[readonly] {
   padding: 0;
   flex-shrink: 0;
 }
-.btn svg,.text-link svg,.icon-tile svg {
+.btn svg,.text-link svg {
   width: var(--icon-size);
   height: var(--icon-size);
   stroke-width: 1.75;
@@ -645,3 +645,45 @@ input[readonly],textarea[readonly] {
 
 /* Menu footer note (e.g. the Visão gerencial period menu). */
 .menu-footer { margin-top: 4px; padding: 8px 8px 6px; border-top: 1px solid var(--border); font-size: 12px; line-height: 16px; color: var(--subtle); max-width: 232px; }
+
+/* Filter chip (components/filter-chip.tsx): dashed when empty, solid "Nome: valor" + × when applied. */
+.choice-chip-group { display: inline-flex; align-items: stretch; flex: none; height: var(--chip-height, var(--control-height)); border-radius: 6px; }
+.choice-chip-group .popover-anchor { display: flex; }
+.choice-chip { display: inline-flex; align-items: center; gap: 6px; height: var(--chip-height, var(--control-height)); padding: 0 10px; border: 1px dashed var(--border-strong); border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; white-space: nowrap; transition: background-color 120ms ease, color 120ms ease; }
+.choice-chip:hover { background: var(--surface-hover); color: var(--ink); }
+.choice-chip-group.is-applied .choice-chip { border-style: solid; border-color: var(--border-strong); border-right: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); background: var(--surface); color: var(--ink); }
+.choice-chip-prefix { color: var(--subtle); font-weight: 400; }
+.choice-chip-value { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.choice-chip-remove { display: grid; place-items: center; width: 30px; border: 1px solid var(--border-strong); border-left-color: var(--border); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface); color: var(--muted); }
+.choice-chip-remove:hover { background: var(--surface-hover); color: var(--ink); }
+.choice-chip-popover { min-width: 264px; padding: 4px; }
+.choice-chip-options { display: flex; flex-direction: column; }
+.choice-chip-option { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 8px; border-radius: 6px; color: var(--ink); font-size: 13px; cursor: pointer; }
+.choice-chip-option:hover, .choice-chip-option:focus-visible { background: var(--surface-hover); }
+.choice-chip-option[aria-selected="true"] { background: var(--surface-selected); font-weight: 500; }
+.choice-chip-option.is-all { position: relative; margin-bottom: 5px; }
+.choice-chip-option.is-all::before { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; border-top: 1px solid var(--border); }
+.choice-chip-check { display: inline-grid; place-items: center; width: 14px; flex: none; color: var(--green-ink); }
+.choice-chip-text { display: flex; flex-direction: column; min-width: 0; }
+.choice-chip-text small { font-size: 12px; line-height: 16px; color: var(--subtle); font-weight: 400; }
+@media (max-width: 767px) {
+  .choice-chip-group { --chip-height: 44px; }
+  .choice-chip-option { min-height: 44px; }
+}
+
+/* Tabs (components/tabs.tsx). `underline` separates page sections; `pill` is the compact
+ * switch of a panel header. Hosts only adjust layout (height, padding, distribution). */
+.tabs { display: flex; min-width: 0; }
+.tabs [role="tab"] { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font: var(--type-body-sm); font-weight: 500; white-space: nowrap; transition: color 120ms ease, box-shadow 120ms ease; }
+.tabs [role="tab"]:hover { color: var(--ink); }
+.tabs-underline { gap: 20px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.tabs-underline [role="tab"] { flex: none; height: 44px; padding: 0 2px; box-shadow: inset 0 -2px 0 transparent; }
+.tabs-underline [role="tab"][aria-selected="true"] { color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); }
+.tabs-underline [role="tab"]:focus-visible { outline-offset: -2px; }
+.tabs-pill { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-sm); background: var(--surface-muted); }
+.tabs-pill [role="tab"] { height: 28px; padding: 0 var(--space-3); border-radius: 6px; background: transparent; }
+.tabs-pill [role="tab"][aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px var(--shadow-color), 0 0 0 1px var(--border); }
+.tab-count { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--surface-muted); color: var(--muted); font-size: 12px; line-height: 1; font-weight: 500; }
+/* A heading + hint inside a form (e.g. "Disponibilidade semanal"). */
+.form-section { display: flex; flex-direction: column; gap: var(--space-1); }
+.form-section h3 { font: var(--type-title-sm); }

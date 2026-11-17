@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowUpDown, ChevronRight, Filter, Plus, X } from 'lucide-react';
+import { ArrowUpDown, ChevronRight, Plus } from 'lucide-react';
 import { useDemo } from '@/components/demo-provider';
-import { Avatar, Badge, Button, EmptyState, Field, Menu, PageHeading, Popover, SearchInput, type MenuItem } from '@/components/ui';
+import { FilterChip } from '@/components/filter-chip';
+import { Avatar, Badge, Button, EmptyState, Menu, PageHeading, SearchInput, type MenuItem } from '@/components/ui';
 import { dayMonth, relativeAgo } from '@/lib/date';
 import {
   appointmentWhen, filterPatients, paginate, parseOrder, parseSort, parseView, sortPatients, viewCounts,
@@ -81,7 +82,7 @@ export function PatientList({ onCreate }: { onCreate: () => void }) {
   }
 
   return <div className="page-stack patients-page" data-density="standard">
-    <PageHeading trail={['Gestão', 'Pacientes']} title="Pacientes" actions={<Button onClick={onCreate}><Plus size={16} />Cadastrar paciente</Button>} />
+    <PageHeading title="Pacientes" actions={<Button onClick={onCreate}><Plus size={16} />Cadastrar paciente</Button>} />
     {params.has('id') && <div className="warning-banner">Paciente não encontrado. Escolha um dos cadastros disponíveis.</div>}
     <section className="patient-card" aria-label="Lista de pacientes">
       <div className="patient-list-bar">
@@ -92,14 +93,9 @@ export function PatientList({ onCreate }: { onCreate: () => void }) {
         </div>
         <span className="bar-spacer" />
         <SearchInput className="patient-search" aria-label="Buscar paciente" placeholder="Buscar por nome ou telefone" value={q} onChange={(e) => update({ q: e.target.value || null })} />
-        <div className={`insurance-filter${insurance ? ' is-active' : ''}`}>
-          <Popover label="Filtrar por convênio" triggerClassName="btn btn-secondary insurance-trigger" triggerContent={<><Filter size={16} aria-hidden="true" />{insurance ? `Convênio: ${insuranceName}` : 'Convênio'}</>}>
-            {close => <div className="popover-stack">
-              <Field label="Convênio"><select aria-label="Filtrar convênio" value={insurance} onChange={(e) => { update({ insurance: e.target.value || null }); close(); }}><option value="">Todos os convênios</option><option value="particular">Particular</option>{plans.map((item) => <option key={item}>{item}</option>)}</select></Field>
-            </div>}
-          </Popover>
-          {insurance && <button type="button" className="insurance-clear" aria-label="Limpar filtro de convênio" onClick={() => update({ insurance: null })}><X size={14} aria-hidden="true" /></button>}
-        </div>
+        <FilterChip name="Convênio" removeLabel="Limpar filtro de convênio" value={insurance} valueLabel={insuranceName}
+          options={[{ id: '', label: 'Todos os convênios' }, { id: 'particular', label: 'Particular' }, ...plans.map(item => ({ id: item, label: item }))]}
+          onChange={value => update({ insurance: value || null })} />
         <Menu label={`Ordenar por: ${sortLabels[sort]}`} icon={<ArrowUpDown size={16} aria-hidden="true" />} text={sortLabels[sort]} triggerClassName="btn btn-secondary" items={sortItems} className="patient-sort" />
       </div>
       {body}
