@@ -72,16 +72,20 @@ frentes de Banco/Testes e DevOps.
 - Semanas: convenção **0 = Segunda … 6 = Domingo** (igual ao CRM; diferente do JavaScript padrão)
 - Mapeamento de status: `agendada→pending`, `confirmada→confirmed`, `realizada→completed`, `falta→no_show`, `ia→bot`, `aguardando→waiting_human`, `humano→human`, `encerrada→closed`
 
-### Dúvidas em aberto (a responder antes da Fase 2)
+### Decisões arquiteturais tomadas (D1–D9)
 
-Ver seção completa em [`docs/data-model.md`](docs/data-model.md) — perguntas D1 a D9:
+Ver detalhes completos em [`docs/data-model.md § Decisões arquiteturais`](docs/data-model.md).
 
-- **D1** Fuso por clínica ou global?
-- **D2** Soft-delete padrão ou `is_active`?
-- **D3** `professionals` são usuários ou cadastro separado?
-- **D4** Duração default de consulta por especialidade ou por profissional?
-- **D5** Histórico de remarcações (tabela própria)?
-- **D6** `knowledge_documents` têm embedding ou só texto?
-- **D7** Rate limit por WABA ou por clínica?
-- **D8** Logs de auditoria — quais eventos cobrir?
-- **D9** Simulador usa número de telefone real ou fictício?
+| # | Decisão |
+|---|---------|
+| D1 | Fuso fixo `America/Sao_Paulo` (Brasília) no MVP |
+| D2 | `is_active BOOLEAN` sem soft-delete; `patients` usa `anonymized_at` (LGPD) |
+| D3 | Profissionais e usuários separados; vínculo 1:1 opcional via `professionals.user_id` |
+| D4 | Duração por profissional (`appointment_duration_minutes INT DEFAULT 30`) |
+| D5 | Remarcação por cadeia `rescheduled_from_id`; 409 se já existe uma pending |
+| D6 | Full-text search PostgreSQL (`pt_unaccent`); sem embeddings no MVP |
+| D7 | Limites da Meta — sem rate-limiter próprio no MVP |
+| D8 | Auditoria de acesso, admin, agendamentos, conversas e LGPD (actor_type = user\|agent\|system) |
+| D9 | Simulador usa número fictício E.164; `channel = simulator` |
+
+Restam 5 perguntas do lado do CRM (CQ1–CQ5) detalhadas em `docs/data-model.md`.
