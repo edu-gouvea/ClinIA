@@ -198,10 +198,6 @@
   --overlay: #000000b3;
   --shadow-color: #00000066;
 }
-@theme inline {
-  --color-primary: var(--green);
-  --color-muted: var(--muted);
-}
 /* Control heights: compact 28 · standard 32 · comfortable 40.
  * Block padding = (height − 20px line − 2px border) / 2. */
 :root, [data-density="standard"] {

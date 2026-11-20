@@ -1,6 +1,7 @@
 import { answerQuestion } from './assistant';
-import { addDays, dateTime, weekStart } from './date';
+import { addDays, dateTime, monthShortOf, weekdayOf, weekdaysFull, weekdaysShort, weekStart } from './date';
 import { firstName, isReschedule } from './conversation-inbox';
+import { normalizeText } from './format';
 import { getFreeSlots } from './metrics';
 import { isOpenAppointment } from './scheduling';
 import { validateAppointment } from './services';
@@ -18,15 +19,12 @@ export type ConversationAnswer = {
   slots?: SlotSuggestion[]; draft?: DraftReply; links?: { label: string; href: string }[];
 };
 
-const normalize = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const weekdaysShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const weekdaysLong = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
-const months = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
-const weekday = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
+const weekdaysLong = weekdaysFull.map(day => day.toLowerCase());
+const weekday = weekdayOf;
 const ddmm = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
 
 /** "Qua, 11 nov." */
-export const shortDay = (date: string) => `${weekdaysShort[weekday(date)]}, ${date.slice(8, 10)} ${months[Number(date.slice(5, 7)) - 1]}`;
+export const shortDay = (date: string) => `${weekdaysShort[weekday(date)]}, ${date.slice(8, 10)} ${monthShortOf(date)}`;
 /** "Hoje", "Amanhã" or "Qui, 12 nov.". */
 export const relativeDay = (date: string, referenceDate: string) => date === referenceDate ? 'Hoje' : date === addDays(referenceDate, 1) ? 'Amanhã' : shortDay(date);
 
@@ -36,7 +34,7 @@ const SOURCES = {
 } as const satisfies Record<string, AnswerSource>;
 
 export function classifyConversationQuestion(question: string): ConversationIntent {
-  const text = normalize(question);
+  const text = normalizeText(question);
   if (/resum/.test(text)) return 'summary';
   if (/respost|rascunh|sugir|sugest|escrev|redij|responder/.test(text)) return 'draft';
   if (/horario|livre|vaga|remarc|disponib/.test(text)) return 'slots';
@@ -80,7 +78,7 @@ export function suggestSlots(state: DemoState, appointment: Appointment, limit =
 }
 
 const STOP = new Set(['para', 'como', 'qual', 'quais', 'voces', 'voce', 'gostaria', 'clinica', 'sobre', 'pode', 'podem', 'esta', 'esse', 'essa', 'isso', 'minha', 'meu', 'tenho', 'preciso', 'obrigada', 'obrigado', 'favor', 'bom', 'dia', 'tarde', 'noite', 'com', 'uma', 'umas', 'atendem', 'atende', 'pelo', 'pela', 'perfeito', 'confirmo', 'recepcao', 'falar', 'pessoa', 'atendente', 'atendimento', 'ajudar', 'ajuda']);
-const words = (text: string) => normalize(text).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !STOP.has(word));
+const words = (text: string) => normalizeText(text).split(/[^a-z0-9]+/).filter(word => word.length >= 4 && !STOP.has(word));
 /** Simple keyword match between the last patient message and active guidance. */
 export function matchKnowledge(state: DemoState, conversation: Conversation): Knowledge | undefined {
   const question = [...conversation.messages].reverse().find(message => message.author === 'paciente' && message.sessionId === conversation.sessionId);
@@ -115,7 +113,7 @@ export function draftReply(state: DemoState, conversation: Conversation, slot?: 
   }
   const lastPatient = [...conversation.messages].reverse().find(message => message.author === 'paciente');
   const toConfirm = futureAppointments(state, patient.id).find(a => a.status === 'agendada');
-  if (toConfirm && /confirm/.test(normalize(`${conversation.reason ?? ''} ${lastPatient?.text ?? ''}`))) {
+  if (toConfirm && /confirm/.test(normalizeText(`${conversation.reason ?? ''} ${lastPatient?.text ?? ''}`))) {
     const professional = state.professionals.find(p => p.id === toConfirm.professionalId);
     return {
       text: `${signature(state, patient.name)} Sua consulta de ${toConfirm.specialty} com ${professional?.name} está marcada para ${weekdaysLong[weekday(toConfirm.date)]} (${ddmm(toConfirm.date)}), às ${toConfirm.start}. Você confirma sua presença?`,

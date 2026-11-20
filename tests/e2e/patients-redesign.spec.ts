@@ -26,7 +26,8 @@ const confirmPatient = filterPatients(seed, { view: 'pendencias' }).find(r => r.
 test('(a) lista mostra as pendências: pedido de remarcação e consulta a confirmar', async ({ page }) => {
   await open(page, '/gestao/pacientes');
   await expect(page.locator('h1')).toHaveText('Pacientes');
-  await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toContainText('Gestão');
+  // Pacientes is a primary destination (sidebar), like Início: no "Gestão /" breadcrumb.
+  await expect(page.getByRole('navigation', { name: 'Trilha de navegação' })).toHaveCount(0);
   await expect(page.getByText('Pessoas no centro. Informações sempre à mão.')).toHaveCount(0);
   const ana = row(page, 'Ana Beatriz Santos');
   await expect(ana.locator('.pendency-cell .badge').first()).toHaveText('Pediu remarcação');
@@ -75,10 +76,10 @@ test('(c) busca, convênio, ordenação com aria-sort e paginação de 12', asyn
   await expect(footer).toContainText('13–24 de 24 pacientes');
   await expect(page.getByRole('button', { name: 'Página 2', exact: true })).toHaveAttribute('aria-current', 'page');
 
-  const trigger = page.getByRole('button', { name: 'Convênio', exact: true });
+  const trigger = page.getByRole('button', { name: 'Filtrar por convênio', exact: true });
   await expect(trigger).toHaveCSS('border-top-style', 'dashed');
   await trigger.click();
-  await page.getByLabel('Filtrar convênio').selectOption('Viva Saúde');
+  await page.getByRole('option', { name: 'Viva Saúde', exact: true }).click();
   await expect(page).toHaveURL(/insurance=Viva/);
   await expect(page).not.toHaveURL(/page=2/);
   const active = page.getByRole('button', { name: 'Convênio: Viva Saúde', exact: true });
@@ -174,9 +175,9 @@ test('(f) abas por teclado e na URL; Atividade agrupada com a sessão da Ana e "
   await expect(tabs.getByRole('tab', { name: /^Consultas/ })).toBeFocused();
   await expect(page).toHaveURL(/tab=consultas/);
   await page.keyboard.press('End');
-  await expect(tabs.getByRole('tab', { name: /^Anotações/ })).toHaveAttribute('aria-selected', 'true');
-  await expect(page).toHaveURL(/tab=anotacoes/);
-  await expect(page.getByRole('tabpanel')).toContainText('As anotações aparecem aqui depois que uma consulta é realizada.');
+  await expect(tabs.getByRole('tab', { name: /^Conversas/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/tab=conversas/);
+  await expect(tabs.getByRole('tab')).toHaveCount(3);
   await page.keyboard.press('Home');
   await expect(activity).toBeFocused();
   await expect(page).not.toHaveURL(/tab=/);

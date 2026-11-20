@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { ArrowRight, ArrowUp, ArrowUpRight, Sparkles, User, X } from 'lucide-react';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Tabs, tabPanelProps, type TabItem } from '@/components/tabs';
 import { Avatar, Badge, Button } from '@/components/ui';
 import { formatDate, formatTime } from '@/lib/date';
 import { draftReply, futureAppointments, relativeDay, type ConversationAnswer, type SlotSuggestion } from '@/lib/conversation-assistant';
@@ -22,24 +23,16 @@ type Props = {
 /** Contextual panel: fixed header (tabs + close) outside the scrolling area. */
 export function ContextPanel(props: Props) {
   const { tab, onTab, onClose } = props;
-  const tabs: [PanelTab, string][] = [['paciente', 'Paciente'], ['assistente', 'Assistente']];
-  function onKey(event: KeyboardEvent<HTMLButtonElement>) {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const next: PanelTab = event.key === 'Home' ? 'paciente' : event.key === 'End' ? 'assistente' : tab === 'paciente' ? 'assistente' : 'paciente';
-    onTab(next);
-    requestAnimationFrame(() => document.getElementById(`context-tab-${next}`)?.focus());
-  }
+  const tabs: TabItem<PanelTab>[] = [
+    { key: 'paciente', label: <><User size={14} aria-hidden="true" />Paciente</> },
+    { key: 'assistente', label: <><Sparkles size={14} aria-hidden="true" className="ai-icon" />Assistente</> },
+  ];
   return <div className="context-panel">
     <div className="context-panel-header">
-      <div className="context-tabs" role="tablist" aria-label="Painel contextual">
-        {tabs.map(([key, label]) => <button key={key} id={`context-tab-${key}`} type="button" role="tab" aria-selected={tab === key} aria-controls={`context-panel-${key}`} tabIndex={tab === key ? 0 : -1} onClick={() => onTab(key)} onKeyDown={onKey}>
-          {key === 'paciente' ? <User size={14} aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" className="ai-icon" />}{label}
-        </button>)}
-      </div>
+      <Tabs idPrefix="context" label="Painel contextual" variant="pill" className="context-tabs" items={tabs} value={tab} onChange={onTab} />
       <Button variant="ghost" size="icon" aria-label="Fechar painel" onClick={onClose}><X size={16} /></Button>
     </div>
-    <div id={`context-panel-${tab}`} role="tabpanel" aria-labelledby={`context-tab-${tab}`} className={`context-panel-body context-${tab}`}>
+    <div {...tabPanelProps('context', tab)} className={`context-panel-body context-${tab}`}>
       {tab === 'paciente' ? <PatientTab {...props} /> : <AssistantTab {...props} />}
     </div>
   </div>;

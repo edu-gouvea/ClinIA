@@ -9,6 +9,8 @@ import { answerConversationQuestion } from '@/lib/conversation-assistant';
 import { closedInfo, firstName, formatElapsed, inboxCounts, matchesFilters, resolveInbox, viewOf, waitingSince, type InboxView } from '@/lib/conversation-inbox';
 import { orderConversations } from '@/lib/conversation-presentation';
 import { breakpointQuery } from '@/lib/breakpoints';
+import { failNextDelivery } from '@/lib/demo/demo-adapter';
+import { normalizeText } from '@/lib/format';
 import { conversationStatusLabels, conversationStatusTones } from '@/lib/status-presentation';
 import type { Command, Message } from '@/lib/types';
 import { ContextPanel, insertBlockedReason, type Exchange, type PanelTab } from './conversations/context-panel';
@@ -26,7 +28,6 @@ function subscribeMode(notify: () => void) {
   queries.forEach(query => query.addEventListener('change', notify));
   return () => queries.forEach(query => query.removeEventListener('change', notify));
 }
-const normalize = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 export function Conversations() {
   const { state, act } = useDemo();
@@ -64,11 +65,11 @@ export function Conversations() {
   const claimable = !!selected && !selected.assigneeId && (selected.status === 'ia' || selected.status === 'aguardando');
   const closed = selected?.status === 'encerrada';
   const counts = inboxCounts(state.conversations, state.currentUserId);
-  const searchValue = normalize(search.trim());
+  const searchValue = normalizeText(search.trim());
   const visibleIn = (view: InboxView) => orderConversations(state.conversations.filter(conversation => {
     const contact = state.patients.find(item => item.id === conversation.patientId);
     if (!contact || !matchesFilters(conversation, { ...filters, view, status: view === filters.view ? filters.status : '' }, state.currentUserId)) return false;
-    return !searchValue || normalize(`${contact.name} ${contact.phone}`).includes(searchValue)
+    return !searchValue || normalizeText(`${contact.name} ${contact.phone}`).includes(searchValue)
       || (search.replace(/\D/g, '').length > 0 && contact.phone.replace(/\D/g, '').includes(search.replace(/\D/g, '')));
   }), state.currentUserId);
   const list = visibleIn(filters.view);
@@ -143,8 +144,10 @@ export function Conversations() {
     const id = retry?.id || `message-${crypto.randomUUID()}`;
     const message: Message = { id, text, author: 'humano', authorId: state.currentUserId, at: state.now, delivery: 'pendente', sessionId: selected.sessionId };
     setPending({ conversationId: selected.id, message });
+    // Demo tool: the simulated provider reports this (first) delivery as failed.
     const shouldFail = failNextMessage && !retry;
-    const success = await execute({ type: 'conversation.send', id: selected.id, text, messageId: id, fail: shouldFail }, shouldFail ? 'Falha de envio simulada. Use “Tentar novamente” na mensagem.' : 'Mensagem enviada.');
+    if (shouldFail) failNextDelivery();
+    const success = await execute({ type: 'conversation.send', id: selected.id, text, messageId: id }, shouldFail ? 'Falha de envio simulada. Use “Tentar novamente” na mensagem.' : 'Mensagem enviada.');
     setPending(null);
     if (success) {
       setDrafts(current => ({ ...current, [selected.id]: '' }));

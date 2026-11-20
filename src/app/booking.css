@@ -32,7 +32,7 @@
 .mini-calendar-lg .mini-calendar-heading { gap: 4px; }
 .mini-calendar-lg .mini-calendar-title { flex: 1 1 auto; font-size: 15px; line-height: 20px; font-weight: 600; }
 .mini-calendar-lg .mini-calendar-title span { color: var(--subtle); font-weight: 500; }
-.mini-calendar-lg th { height: 24px; font-size: 11px; font-weight: 500; color: var(--subtle); letter-spacing: .2px; }
+.mini-calendar-lg th { height: 24px; font-size: 12px; font-weight: 500; color: var(--subtle); letter-spacing: .2px; }
 .mini-calendar-lg td { padding: 2px; }
 .mini-calendar-lg .mini-day { width: 100%; max-width: 48px; height: 36px; border-radius: var(--radius-sm); font-size: 14px; color: var(--ink); }
 .mini-calendar-lg .mini-day.is-today { box-shadow: none; color: var(--ink); font-weight: 600; }
@@ -86,28 +86,10 @@
 .details-meta dd { margin: 0; font-size: 13px; line-height: 20px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
 .details-meta dd small { display: block; font-size: 12px; line-height: 16px; font-weight: 400; color: var(--subtle); }
 .details-cancelled { padding: 10px 14px; border-radius: 10px; background: var(--surface-muted); color: var(--ink); font-size: 13px; line-height: 20px; }
-.details-note-hint { font-size: 12px; line-height: 16px; color: var(--subtle); }
 .details-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .details-section-head h3, .details-history h3 { display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 20px; font-weight: 600; }
 .details-section-head h3 svg, .details-history h3 svg { color: var(--muted); }
 .details-section-head span { font-size: 12px; line-height: 16px; color: var(--subtle); }
-.note-composer { border: 1px solid var(--control-border); border-radius: 10px; overflow: hidden; background: var(--surface); }
-.note-composer:focus-within { border-color: var(--focus-ring); box-shadow: 0 0 0 1px var(--focus-ring); }
-.note-composer textarea { display: block; width: 100%; min-height: 76px; padding: 12px 14px; border: 0; border-radius: 0; background: transparent; color: var(--ink); font: var(--type-body); line-height: 22px; resize: vertical; outline: none; box-shadow: none; }
-.note-composer-footer { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-top: 1px solid var(--border); background: var(--bg); }
-.note-composer-footer small { margin-right: auto; font-size: 12px; line-height: 16px; color: var(--subtle); }
-.note-card-current { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; }
-.note-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.note-card-head strong { font-size: 13px; line-height: 20px; font-weight: 500; }
-.note-card-head > span { font-size: 12px; line-height: 16px; color: var(--subtle); }
-.note-card-head .note-edit { margin-left: auto; height: 28px; min-height: 28px; padding: 0 10px; font-size: 13px; }
-.note-body { font-size: 14px; line-height: 22px; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
-.note-card-current .note-versions { margin: 0; padding: 0; border: 0; background: none; }
-.note-card-current .note-versions summary { font-size: 12px; line-height: 16px; color: var(--muted); cursor: pointer; }
-.note-card-current .note-versions ol { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
-.note-card-current .note-versions li { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-subtle); }
-.note-version-meta { display: block; font-size: 12px; line-height: 16px; color: var(--subtle); }
-.note-card-current .note-versions p { margin-top: 4px; font-size: 13px; line-height: 20px; color: var(--ink); white-space: pre-wrap; }
 .details-history ol { display: flex; flex-direction: column; margin: 10px 0 0; padding: 0; list-style: none; }
 .details-history li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: baseline; column-gap: 10px; padding: 6px 0; font-size: 13px; line-height: 20px; }
 .details-history li + li { border-top: 1px solid var(--border); }

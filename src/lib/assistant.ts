@@ -1,5 +1,6 @@
 import type { AssistantEntry, DemoState, Period } from './types';
-import { addDays, dateTime, formatDate, formatPeriod, weekStart } from './date';
+import { addDays, dateTime, formatDate, formatPeriod, isValidDate as validDate, weekStart } from './date';
+import { normalizeText } from './format';
 import { getFreeSlots, getMetrics, getPeriod } from './metrics';
 import { conversationStatusLabels } from './status-presentation';
 
@@ -11,12 +12,6 @@ export const assistantSuggestions = [
   'Como foram os cancelamentos neste período?',
 ];
 
-function validDate(value: string | null): value is string {
-  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value)
-    && !Number.isNaN(Date.parse(`${value}T12:00:00Z`))
-    && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
-}
-
 function selectedPeriod(state: DemoState, path: string, params: URLSearchParams): Period {
   const days = Number(params.get('period') || params.get('days') || 7);
   const fallback = getPeriod(state.referenceDate, [1, 7, 30].includes(days) ? days : 7);
@@ -25,7 +20,7 @@ function selectedPeriod(state: DemoState, path: string, params: URLSearchParams)
   if (path === '/gestao/agenda') {
     const requestedDate = params.get('date');
     const date = validDate(requestedDate) ? requestedDate : state.referenceDate;
-    return params.get('view') === 'week' ? { start: weekStart(date), end: addDays(weekStart(date), 6) } : { start: date, end: date };
+    return ['semana', 'week'].includes(params.get('view') ?? '') ? { start: weekStart(date), end: addDays(weekStart(date), 6) } : { start: date, end: date };
   }
   return fallback;
 }
@@ -49,7 +44,7 @@ export function describeAssistantContext(state: DemoState, path: string, params:
 
 /** Five explicit local intents. This service performs no mutations and does not contact an LLM. */
 export function answerQuestion(state: DemoState, question: string, context: string, url: string): AssistantEntry {
-  const normalized = question.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const normalized = normalizeText(question);
   const parsed = new URL(context ? url : '/inicio', 'https://clinia.local');
   const params = parsed.searchParams;
   const period = selectedPeriod(state, parsed.pathname, params);
@@ -85,7 +80,7 @@ export function answerQuestion(state: DemoState, question: string, context: stri
     }).filter(x => x.count > 0);
     entry.period = `${formatDate(state.referenceDate)} a ${formatDate(end)}`;
     entry.answer = rows.length ? `Opções de início para consultas de 30 minutos nesta semana, respeitando funcionamento, disponibilidade, bloqueios e consultas existentes:\n${rows.map(x => `${x.p.name}: primeira opção ${x.first}.`).join('\n')}\nAs opções são alternativas de início e não representam vagas cumulativas.` : 'Não encontrei horários livres de 30 minutos no restante desta semana.';
-    entry.links = rows.map(x => ({ label: x.p.name, href: `/gestao/agenda?professional=${x.p.id}&date=${state.referenceDate}&view=week` }));
+    entry.links = rows.map(x => ({ label: x.p.name, href: `/gestao/agenda?professional=${x.p.id}&date=${state.referenceDate}&view=semana&availability=1` }));
   } else if (/resum.*conversa|conversa.*resum/.test(normalized)) {
     const conversation = context && parsed.pathname === '/conversas' ? state.conversations.find(c => c.id === params.get('id')) : undefined;
     if (!conversation) {

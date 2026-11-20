@@ -116,7 +116,7 @@ test('consulta do Início abre detalhes e remarcação sem sair da tela; X mant�
   if (await done.count()) await done.click();
   else { await details.getByRole('button', { name: 'Mais ações', exact: true }).click(); await page.getByRole('menuitem', { name: 'Marcar como realizada', exact: true }).click(); }
   await expect(details.getByRole('status')).toContainText('Consulta realizada.');
-  await expect(details.getByLabel('Nova anotação', { exact: true })).toBeVisible();
+  await expect(details.getByRole('textbox')).toHaveCount(0);
   await details.getByRole('button', { name: 'Fechar', exact: true }).click();
   await expect(page).toHaveURL('/inicio?period=30');
   expect(await page.locator('.home-today-row').first().getAttribute('href')).not.toBe(href);

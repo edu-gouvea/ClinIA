@@ -3,7 +3,8 @@ import test from 'node:test';
 import { createDemoState } from '../src/lib/demo-data';
 import { addDays, dateTime, formatTime, weekStart } from '../src/lib/date';
 import { getAvailability, getFreeSlots, getMetrics, getPeriod } from '../src/lib/metrics';
-import { failNextRequest, runCommand } from '../src/lib/services';
+import { failNextDelivery, failNextRequest, runDemoCommand } from '../src/lib/demo/demo-adapter';
+import { runCommand } from '../src/lib/services';
 import { isDemoState } from '../src/lib/state-validation';
 import type { AppointmentInput, DemoState } from '../src/lib/types';
 
@@ -157,12 +158,18 @@ test('conversation ownership is checked by the service, not only UI', async () =
 
 test('failed message retries preserve one identity without duplication', async () => {
   let state = await runCommand(cleanState(), { type: 'conversation.claim', id: 'conversation-1' });
-  state = await runCommand(state, { type: 'conversation.send', id: 'conversation-1', text: 'Olá, vou ajudar!', messageId: 'retry-message', fail: true });
+  failNextDelivery();
+  state = await runDemoCommand(state, { type: 'conversation.send', id: 'conversation-1', text: 'Olá, vou ajudar!', messageId: 'retry-message' });
   assert.equal(state.conversations[0].messages.at(-1)?.delivery, 'falha');
-  state = await runCommand(state, { type: 'conversation.send', id: 'conversation-1', text: 'Olá, vou ajudar!', messageId: 'retry-message' });
-  state = await runCommand(state, { type: 'conversation.send', id: 'conversation-1', text: 'Olá, vou ajudar!', messageId: 'retry-message' });
-  assert.equal(state.conversations[0].messages.filter((message) => message.id === 'retry-message').length, 1);
-  assert.equal(state.conversations[0].messages.at(-1)?.delivery, 'enviada');
+  const sentEvents = state.conversations[0].events.filter(e => e.type === 'conversation.send').length;
+  state = await runDemoCommand(state, { type: 'conversation.send', id: 'conversation-1', text: 'Olá, vou ajudar!', messageId: 'retry-message' });
+  state = await runDemoCommand(state, { type: 'conversation.send', id: 'conversation-1', text: 'Olá, vou ajudar!', messageId: 'retry-message' });
+  const messages = state.conversations[0].messages.filter((message) => message.id === 'retry-message');
+  assert.equal(messages.length, 1);
+  assert.deepEqual([messages[0].delivery, messages[0].attempts], ['enviada', 2]);
+  const sent = state.conversations[0].events.filter(e => e.type === 'conversation.send');
+  assert.equal(sent.length, sentEvents + 1, 'one send event, after the successful retry');
+  assert.equal(sent.at(-1)?.description, 'Mensagem humana enviada após nova tentativa.');
 });
 
 test('return waits for patient; closed sessions reopen without losing messages or events', async () => {
@@ -170,14 +177,14 @@ test('return waits for patient; closed sessions reopen without losing messages o
   const previousAI = state.conversations[0].messages.filter((message) => message.author === 'ia').length;
   state = await runCommand(state, { type: 'conversation.return', id: 'conversation-1' });
   assert.equal(state.conversations[0].messages.filter((message) => message.author === 'ia').length, previousAI);
-  state = await runCommand(state, { type: 'conversation.receive', id: 'conversation-1', text: 'Obrigada' });
+  state = await runDemoCommand(state, { type: 'conversation.receive', id: 'conversation-1', text: 'Obrigada' });
   assert.equal(state.conversations[0].messages.filter((message) => message.author === 'ia').length, previousAI + 1);
   state = await runCommand(state, { type: 'conversation.claim', id: 'conversation-1' });
   state = await runCommand(state, { type: 'conversation.close', id: 'conversation-1' });
   const previousSession = state.conversations[0].sessionId;
   const previousMessages = state.conversations[0].messages.length;
   const previousEvents = state.conversations[0].events.length;
-  state = await runCommand(state, { type: 'conversation.receive', id: 'conversation-1', text: 'Olá novamente' });
+  state = await runDemoCommand(state, { type: 'conversation.receive', id: 'conversation-1', text: 'Olá novamente' });
   assert.notEqual(state.conversations[0].sessionId, previousSession);
   assert.equal(state.conversations[0].status, 'ia');
   assert.ok(state.conversations[0].messages.length > previousMessages);
@@ -188,7 +195,7 @@ test('return waits for patient; closed sessions reopen without losing messages o
 test('recoverable failure preserves state and succeeds on next attempt', async () => {
   const state = cleanState();
   failNextRequest();
-  await assert.rejects(runCommand(state, { type: 'appointment.save', input: input() }), /Falha simulada/);
+  await assert.rejects(runDemoCommand(state, { type: 'appointment.save', input: input() }), /Falha simulada/);
   assert.equal(state.appointments.length, 0);
   const next = await runCommand(state, { type: 'appointment.save', input: input() });
   assert.equal(next.appointments.length, 1);
@@ -272,7 +279,7 @@ test('clinic validation rejects invalid contact length and blank specialties', a
 test('service preserves old and new ownership events through return and escalation', async () => {
   let state = await runCommand(cleanState(), { type: 'conversation.claim', id: 'conversation-1' });
   state = await runCommand(state, { type: 'conversation.return', id: 'conversation-1' });
-  state = await runCommand(state, { type: 'conversation.receive', id: 'conversation-1', text: 'Preciso de um atendente' });
+  state = await runDemoCommand(state, { type: 'conversation.receive', id: 'conversation-1', text: 'Preciso de um atendente' });
   const conversation = state.conversations[0];
   assert.equal(conversation.status, 'aguardando');
   assert.equal(conversation.assigneeId, null);
@@ -291,4 +298,21 @@ test('demo seed: today, appointments starting at or after `now` are only agendad
     // Earlier finished slots still carry outcomes, so the demo keeps its history.
     assert.ok(today.some(a => a.start < now && ['realizada', 'falta', 'cancelada'].includes(a.status)));
   }
+});
+
+test('domínio sem simulação: envio fica pendente até o relatório de entrega; IA responde por comando', async () => {
+  let state = await runCommand(cleanState(), { type: 'conversation.claim', id: 'conversation-1' });
+  state = await runCommand(state, { type: 'conversation.send', id: 'conversation-1', text: 'Olá', messageId: 'm-1' });
+  assert.equal(state.conversations[0].messages.at(-1)?.delivery, 'pendente');
+  state = await runCommand(state, { type: 'conversation.delivery', id: 'conversation-1', messageId: 'm-1', delivery: 'enviada' });
+  const delivered = await runCommand(state, { type: 'conversation.delivery', id: 'conversation-1', messageId: 'm-1', delivery: 'falha' });
+  assert.equal(delivered.conversations[0].messages.at(-1)?.delivery, 'enviada', 'a late report never undoes a delivery');
+  // A patient message alone does not make the AI answer: the agent replies with its own command.
+  state = await runCommand(delivered, { type: 'conversation.return', id: 'conversation-1' });
+  const ai = state.conversations[0].messages.filter(m => m.author === 'ia').length;
+  state = await runCommand(state, { type: 'conversation.receive', id: 'conversation-1', text: 'Quero remarcar' });
+  assert.equal(state.conversations[0].messages.filter(m => m.author === 'ia').length, ai);
+  state = await runCommand(state, { type: 'conversation.ai_reply', id: 'conversation-1', text: 'Vou chamar a recepção.', handoff: 'Pedido de remarcação' });
+  assert.deepEqual([state.conversations[0].status, state.conversations[0].reason], ['aguardando', 'Pedido de remarcação']);
+  await assert.rejects(runCommand(state, { type: 'conversation.ai_reply', id: 'conversation-1', text: 'De novo' }), /só responde conversas/);
 });

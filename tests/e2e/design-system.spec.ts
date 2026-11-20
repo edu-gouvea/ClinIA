@@ -55,7 +55,7 @@ test('densidades se aplicam em uso real; busca, seleção, modais e estado indis
   await open(page, '/gestao/pacientes');
   const search = page.getByRole('searchbox', { name: 'Buscar paciente', exact: true });
   // The insurance select moved into a popover; its trigger sits in the same 32 px bar.
-  const filter = page.getByRole('button', { name: 'Convênio', exact: true });
+  const filter = page.getByRole('button', { name: 'Filtrar por convênio', exact: true });
   // Control heights by density: compact 28 · standard 32 · comfortable 40.
   expect((await search.boundingBox())!.height).toBe(32);
   expect((await filter.boundingBox())!.height).toBe(32);

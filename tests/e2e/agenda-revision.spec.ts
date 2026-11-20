@@ -62,24 +62,16 @@ test('remarcação fixa paciente e especialidade; dia no calendário e hora digi
   expect(saved).toMatchObject({ patientId: 'patient-1', professionalId: 'pro-marina', specialty: 'Cardiologia', date: '2026-11-10', start: '11:30' });
 });
 
-test('antecipação de hoje, anotações versionadas persistentes e restrição de datas futuras', async ({ page }) => {
+test('antecipação de hoje, sem anotações clínicas, e restrição de datas futuras', async ({ page }) => {
   await open(page, '/gestao/agenda?appointment=today-early');
   const dialog = page.getByRole('dialog', { name: 'Detalhes da consulta', exact: true });
   // "A confirmar": outcomes moved into the ⋯ menu ("Marcar como realizada").
   await dialog.getByRole('button', { name: 'Mais ações', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Marcar como realizada', exact: true }).click();
-  // The composer replaces the old "Anotações da consulta" field.
-  await expect(dialog.getByLabel('Nova anotação', { exact: true })).toBeVisible();
-  await dialog.getByLabel('Nova anotação', { exact: true }).fill('Primeira anotação de teste fictícia.');
-  await dialog.getByRole('button', { name: 'Salvar anotação', exact: true }).click();
-  await expect(dialog.getByRole('status')).toContainText('Anotações salvas');
-  await page.reload();
-  await expect(dialog.locator('.note-body')).toHaveText('Primeira anotação de teste fictícia.');
-  await dialog.getByRole('button', { name: 'Editar', exact: true }).click();
-  await expect(dialog.getByLabel('Nova anotação', { exact: true })).toHaveValue('Primeira anotação de teste fictícia.');
-  await dialog.getByLabel('Nova anotação', { exact: true }).fill('Versão revisada da anotação fictícia.');
-  await dialog.getByRole('button', { name: 'Salvar anotação', exact: true }).click();
-  await expect.poll(async () => (await readState(page)).appointments.find(a => a.id === 'today-early')?.notes?.length).toBe(2);
+  await expect.poll(async () => (await readState(page)).appointments.find(a => a.id === 'today-early')?.status).toBe('realizada');
+  // ClinIA is administrative: a completed appointment offers no clinical free-text field.
+  await expect(dialog.getByRole('textbox')).toHaveCount(0);
+  await expect(dialog).not.toContainText('Anotaç');
   await open(page, '/gestao/agenda?appointment=today-miss');
   await dialog.getByRole('button', { name: 'Mais ações', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Registrar falta', exact: true }).click();

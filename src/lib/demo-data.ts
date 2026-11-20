@@ -1,10 +1,10 @@
-import { addDays, dateTime, minutes, timeFromMinutes, todayInRecife } from './date';
+import { addDays, dateTime, minutes, timeFromMinutes, todayInClinic } from './date';
 import { getAvailability } from './metrics';
 import type { Appointment, AppointmentStatus, Conversation, DemoState, Message, WeekSlot } from './types';
 
 const hours = (days: number[], start: string, end: string): WeekSlot[] => days.map((day) => ({ day, start, end }));
 
-export function createDemoState(referenceDate = todayInRecife()): DemoState {
+export function createDemoState(referenceDate = todayInClinic()): DemoState {
   const state: DemoState = {
     version: 1,
     referenceDate,
@@ -20,9 +20,9 @@ export function createDemoState(referenceDate = todayInRecife()): DemoState {
       hours: [...hours([1, 2, 3, 4, 5], '08:00', '18:00'), ...hours([6], '08:00', '14:00'), ...hours([0], '08:00', '12:00')],
     },
     users: [
-      { id: 'user-marina', name: 'Marina Costa', role: 'Administradora' },
-      { id: 'user-rafael', name: 'Rafael Melo', role: 'Atendente' },
-      { id: 'user-beatriz', name: 'Beatriz Lima', role: 'Atendente' },
+      { id: 'user-marina', name: 'Marina Costa', role: 'Administradora', access: 'admin' },
+      { id: 'user-rafael', name: 'Rafael Melo', role: 'Atendente', access: 'attendant' },
+      { id: 'user-beatriz', name: 'Beatriz Lima', role: 'Atendente', access: 'attendant' },
     ],
     patients: [
       ['Ana Beatriz Santos', '(81) 90000-0101', 'Viva Saúde'], ['Pedro Almeida', '(81) 90000-0102', 'Particular'],

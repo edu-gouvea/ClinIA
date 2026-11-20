@@ -1,8 +1,8 @@
 'use client';
-import { useState, type KeyboardEvent } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowUpRight, Ban, CalendarPlus, Check, CheckCheck, CircleCheck, Clock, Clock3, FileText, MoreHorizontal, Repeat, XCircle, type LucideIcon } from 'lucide-react';
+import { ArrowUpRight, Ban, CalendarPlus, Check, CheckCheck, CircleCheck, Clock, Clock3, MoreHorizontal, Repeat, XCircle, type LucideIcon } from 'lucide-react';
 import { useDemo } from '@/components/demo-provider';
 import { Badge, Button, Field, Menu, Modal, type MenuItem } from '@/components/ui';
 import { formatDate, formatTime } from '@/lib/date';
@@ -11,16 +11,14 @@ import { rescheduleRequestIds } from '@/lib/agenda-presentation';
 import { canRecordOutcome, cancellationReason, isOpenAppointment } from '@/lib/scheduling';
 import type { Appointment, AppointmentStatus } from '@/lib/types';
 import { appointmentStatusLabels, appointmentStatusPresentation } from '@/lib/status-presentation';
-import { ProfessionalAvatar } from './professional-avatar';
 
 const statusIcons: Record<AppointmentStatus, LucideIcon> = { agendada: Clock3, confirmada: CircleCheck, realizada: CheckCheck, falta: XCircle, cancelada: Ban };
 const HISTORY_PREVIEW = 5;
-const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-/** "Detalhes da consulta": header, metadata, cancellation, notes, history and the
- * status actions in the footer. Same rules and Commands as before: outcomes only today
- * or earlier (`canRecordOutcome`), final states never reopen, notes only after
- * "realizada" and every save is a new version. */
+/** "Detalhes da consulta": header, metadata, cancellation, history and the status
+ * actions in the footer. Outcomes only today or earlier (`canRecordOutcome`) and final
+ * states never reopen. There is no free-text clinical note: ClinIA is administrative
+ * (see docs/DECISOES.md). */
 export function AppointmentDetails({ appointment, onClose, onReschedule }: { appointment: Appointment; onClose: () => void; onReschedule: () => void }) {
   const { state, act } = useDemo();
   const context = useSearchParams().get('context');
@@ -73,8 +71,6 @@ export function AppointmentDetails({ appointment, onClose, onReschedule }: { app
         <div><dt>Marcada por</dt><dd>{created ? <>{userName(created.authorId)}<small className="tabular">{formatDate(created.at)} · {formatTime(created.at)}</small></> : '—'}</dd></div>
       </dl>
       {appointment.status === 'cancelada' && <div className="details-cancelled">{cancellationReason(appointment) ? <>Motivo: “{appointment.cancelReason}”</> : 'Cancelada sem motivo registrado'}</div>}
-      {appointment.status === 'realizada' ? <Notes appointment={appointment} onMessage={(message) => { setError(message.error ?? ''); setSuccess(message.success ?? ''); }} />
-        : open && <p className="details-note-hint">As anotações ficam disponíveis depois que a consulta for realizada.</p>}
       <section className="details-history" aria-labelledby={`history-${appointment.id}`}>
         <h3 id={`history-${appointment.id}`}><Clock size={16} aria-hidden="true" />Histórico</h3>
         <ol>{shownEvents.map(event => { const line = appointmentEventLine(event); return <li key={event.id} data-tone={line.tone}>
@@ -99,54 +95,4 @@ export function AppointmentDetails({ appointment, onClose, onReschedule }: { app
       </>}
     </footer>
   </Modal>;
-}
-
-function Notes({ appointment, onMessage }: { appointment: Appointment; onMessage: (message: { error?: string; success?: string }) => void }) {
-  const { state, act } = useDemo();
-  const notes = appointment.notes ?? [];
-  const latest = notes.at(-1);
-  const [editing, setEditing] = useState(!latest);
-  const [text, setText] = useState(latest?.text ?? '');
-  const [busy, setBusy] = useState(false);
-  const composing = editing || !latest;
-  const unchanged = !text.trim() || text.trim() === latest?.text;
-  const professionalOf = (id: string) => state.professionals.find(p => p.id === id);
-
-  async function save() {
-    if (busy || unchanged) return;
-    setBusy(true); onMessage({});
-    try { await act({ type: 'appointment.note', id: appointment.id, text }); onMessage({ success: 'Anotações salvas no histórico da consulta.' }); setEditing(false); }
-    catch (cause) { onMessage({ error: cause instanceof Error ? cause.message : 'Não foi possível salvar a anotação.' }); }
-    finally { setBusy(false); }
-  }
-  function onKey(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); save(); }
-  }
-  const author = latest && professionalOf(latest.professionalId);
-  const previous = notes.slice(0, -1).reverse();
-
-  return <section className="details-notes" aria-labelledby={`notes-${appointment.id}`}>
-    <div className="details-section-head"><h3 id={`notes-${appointment.id}`}><FileText size={16} aria-hidden="true" />Anotações</h3><span>Ficam no histórico desta consulta</span></div>
-    {composing ? <div className="note-composer">
-      <label className="sr-only" htmlFor={`note-${appointment.id}`}>Nova anotação</label>
-      <textarea id={`note-${appointment.id}`} value={text} onChange={e => setText(e.target.value)} onKeyDown={onKey} maxLength={10000} placeholder="Adicionar uma anotação…" autoFocus={editing && !!latest} />
-      <div className="note-composer-footer">
-        <small>{isMac() ? '⌘' : 'Ctrl'} + Enter salva</small>
-        {latest && <Button variant="ghost" disabled={busy} onClick={() => { setEditing(false); setText(latest.text); }}>Cancelar</Button>}
-        <Button disabled={busy || unchanged} onClick={save}>{busy ? 'Salvando…' : 'Salvar anotação'}</Button>
-      </div>
-    </div> : latest && <article className="note-card-current">
-      <div className="note-card-head">
-        {author ? <ProfessionalAvatar professional={author} size={24} /> : null}
-        <strong>{author?.name ?? 'Profissional'}</strong>
-        <span className="tabular">{formatDate(latest.at)} · {formatTime(latest.at)}</span>
-        <Button variant="ghost" className="note-edit" onClick={() => { setText(latest.text); setEditing(true); }}>Editar</Button>
-      </div>
-      <p className="note-body">{latest.text}</p>
-      {previous.length > 0 && <details className="note-versions">
-        <summary>Versão {notes.length} · ver {previous.length} {previous.length === 1 ? 'versão anterior' : 'versões anteriores'}</summary>
-        <ol>{previous.map(version => <li key={version.id}><span className="note-version-meta">{professionalOf(version.professionalId)?.name ?? 'Profissional'} · registro por {state.users.find(u => u.id === version.recordedByUserId)?.name ?? 'equipe'} · <span className="tabular">{formatDate(version.at)} · {formatTime(version.at)}</span></span><p>{version.text}</p></li>)}</ol>
-      </details>}
-    </article>}
-  </section>;
 }

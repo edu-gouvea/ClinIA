@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useId, useRef, useState } from 'react';
 import { ArrowRight, CalendarCheck, Check, ChevronDown, ChevronRight, Clock3, Info, MessageCircle, Plus, Repeat, Sparkles } from 'lucide-react';
 import { useAssistant } from '@/components/assistant-provider';
-import { StackedBarChart, type StackedDatum, type StackedSeries } from '@/components/stacked-bar-chart';
+import { StackedBarChart } from '@/components/stacked-bar-chart';
 import { Badge, Button, EmptyState } from '@/components/ui';
 import { KpiStrip } from '@/components/kpi-strip';
-import { dateTime, formatDate, formatPeriod, minutes, timeFromMinutes } from '@/lib/date';
+import { chartSeries, dailyChartData } from '@/lib/appointment-chart';
+import { dateTime, formatDate, formatPeriod, formatTime, minutes, shortPeriod, timeFromMinutes } from '@/lib/date';
+import { currentUser } from '@/lib/permissions';
+import { capitalize, formatRate, plural } from '@/lib/format';
 import { metricComparison } from '@/lib/metric-comparison';
-import { dailyBreakdown } from '@/lib/management-analysis';
 import { getFreeSlots } from '@/lib/metrics';
 import { isOpenAppointment } from '@/lib/scheduling';
 import { appointmentStatusLabels, appointmentStatusTones } from '@/lib/status-presentation';
@@ -19,50 +21,14 @@ import { AppointmentDetails } from './agenda/appointment-details';
 import { AppointmentForm } from './agenda/appointment-form';
 
 const PREVIEW = 6;
-const months = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
-const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const weekdaysLong = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-const dayOf = (date: string) => date.slice(8, 10);
-const monthOf = (date: string) => months[Number(date.slice(5, 7)) - 1];
-const weekdayIndex = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
-const plural = (count: number, one: string, many: string) => `${count.toLocaleString('pt-BR')} ${count === 1 ? one : many}`;
-const ratio = (value: number | null) => value === null ? 'Sem dados' : `${value.toFixed(1).replace('.', ',')}%`;
-const capitalize = (text: string) => text.charAt(0).toLocaleUpperCase('pt-BR') + text.slice(1);
-
-/** Short interval, e.g. "04–10 nov.", "28 out.–03 nov." or "09 nov.". */
-export function shortPeriod(period: Period) {
-  if (period.start === period.end) return `${dayOf(period.start)} ${monthOf(period.start)}`;
-  if (period.start.slice(0, 7) === period.end.slice(0, 7)) return `${dayOf(period.start)}–${dayOf(period.end)} ${monthOf(period.end)}`;
-  return `${dayOf(period.start)} ${monthOf(period.start)}–${dayOf(period.end)} ${monthOf(period.end)}`;
-}
-
-/** Columns of the "Consultas por dia" chart (Início and Visão gerencial): one per day
- * from `dailyBreakdown`, "Hoje" highlighted, sparse labels in the 30-day view. */
-export function dailyChartData(state: DemoState, period: Period, days: number, professionalId: string, specialty: string): StackedDatum[] {
-  const data: StackedDatum[] = dailyBreakdown(state, { professionalId, specialty }, period).slice(0, 366).map((day, index) => {
-    const date = day.date; const isToday = date === state.referenceDate;
-    return {
-      id: date, highlight: isToday, label: isToday ? 'Hoje' : `${weekdays[weekdayIndex(date)]} ${dayOf(date)}`, shortLabel: isToday ? 'Hoje' : dayOf(date),
-      fullLabel: `${weekdaysLong[weekdayIndex(date)]}, ${dayOf(date)} ${monthOf(date)}`,
-      showLabel: days < 30 || isToday || index % 5 === 0,
-      values: { completed: day.completed, missed: day.missed, cancelled: day.cancelled, planned: day.planned },
-    };
-  });
-  // A label right before "Hoje" would collide with it in the 30-day view.
-  if (days >= 30) data.forEach((datum, index) => { if (index >= data.length - 3 && !datum.highlight) datum.showLabel = false; });
-  return data;
-}
-
-export const chartSeries: StackedSeries[] = [
-  { key: 'completed', label: 'Realizadas', unit: 'realizadas', color: 'var(--data-realizadas)' },
-  { key: 'missed', label: 'Faltas', unit: 'faltas', color: 'var(--data-faltas)' },
-  { key: 'cancelled', label: 'Canceladas', unit: 'canceladas', color: 'var(--data-canceladas)' },
-  { key: 'planned', label: 'Em aberto', unit: 'em aberto', color: 'var(--data-em-aberto)', outlined: true },
-];
 
 type Props = { state: DemoState; period: Period; previous: Period; metrics: Metrics; before: Metrics; days: number; professionalId: string; specialty: string; onPeriod: (value: string) => void };
 
+const greeting = (now: string) => { const hour = Number(formatTime(now).slice(0, 2)); return hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'; };
+const firstName = (name: string) => name.split(' ')[0];
+
 export function HomeOverview({ state, period, previous, metrics, before, days, professionalId, specialty, onPeriod }: Props) {
+  const user = currentUser(state);
   const { openAssistant } = useAssistant();
   const router = useRouter();
   const params = useSearchParams();
@@ -112,8 +78,8 @@ export function HomeOverview({ state, period, previous, metrics, before, days, p
   const results = metrics.completed + metrics.missed;
   const kpis = [
     { title: 'Consultas realizadas', value: String(metrics.completed), detail: 'Resultados registrados', href: agendaHref('realizada'), change: metricComparison(metrics.completed, before.completed, false, 'higher') },
-    { title: 'Ocupação da agenda', value: ratio(metrics.occupancy), detail: `${(metrics.bookedMinutes / 60).toLocaleString('pt-BR')} h ocupadas de ${(metrics.availableMinutes / 60).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} h`, href: agendaHref(), change: metricComparison(metrics.occupancy, before.occupancy, true) },
-    { title: 'Taxa de faltas', value: ratio(metrics.absenceRate), detail: `${plural(metrics.missed, 'falta', 'faltas')} em ${plural(results, 'resultado', 'resultados')}`, href: agendaHref('falta'), change: metricComparison(metrics.absenceRate, before.absenceRate, true, 'lower') },
+    { title: 'Ocupação da agenda', value: formatRate(metrics.occupancy), detail: `${(metrics.bookedMinutes / 60).toLocaleString('pt-BR')} h ocupadas de ${(metrics.availableMinutes / 60).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} h`, href: agendaHref(), change: metricComparison(metrics.occupancy, before.occupancy, true) },
+    { title: 'Taxa de faltas', value: formatRate(metrics.absenceRate), detail: `${plural(metrics.missed, 'falta', 'faltas')} em ${plural(results, 'resultado', 'resultados')}`, href: agendaHref('falta'), change: metricComparison(metrics.absenceRate, before.absenceRate, true, 'lower') },
     { title: 'Em aberto', value: String(metrics.planned), detail: 'Agendadas ou confirmadas, sem resultado', href: `${agendaHref()}&status=previstas`, change: metricComparison(metrics.planned, before.planned) },
   ];
   const chartData = dailyChartData(state, period, days, professionalId, specialty);
@@ -130,7 +96,7 @@ export function HomeOverview({ state, period, previous, metrics, before, days, p
     <header className="home-header">
       <div className="home-heading">
         <p className="home-date">{capitalize(formatDate(state.referenceDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</p>
-        <h1>Bom dia, Marina</h1>
+        <h1>{greeting(state.now)}{user ? `, ${firstName(user.name)}` : ''}</h1>
         <p className="home-summary">Hoje: <strong>{plural(today.length, 'consulta', 'consultas')}</strong> · <strong>{plural(pending.length, 'pendente', 'pendentes')}</strong> · {waiting ? <strong>{plural(waiting, 'conversa aguardando', 'conversas aguardando')}</strong> : 'nenhuma conversa aguardando'}</p>
       </div>
       <Button className="home-new" onClick={() => setNewAppointment(true)}><Plus size={16} /> Novo agendamento</Button>

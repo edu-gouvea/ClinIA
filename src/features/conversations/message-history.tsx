@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, CheckCheck, CircleAlert, Clock3, RotateCcw, Sparkles } from 'lucide-react';
 import { Button, EmptyState } from '@/components/ui';
-import { CLINIC_TIMEZONE } from '@/lib/date';
+import { clinicTimeZone } from '@/lib/date';
 import type { Conversation, DemoState, Message } from '@/lib/types';
 
 /** Patient bubbles carry no label; IA and staff are labelled ("Você" for the current user). */
@@ -12,10 +12,9 @@ function authorLabel(message: Message, state: DemoState) {
   if (message.authorId === state.currentUserId) return 'Você';
   return state.users.find(user => user.id === message.authorId)?.name ?? 'Atendente';
 }
-const dayFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: CLINIC_TIMEZONE, day: 'numeric', month: 'long', year: 'numeric' });
-const timeFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: CLINIC_TIMEZONE, hour: '2-digit', minute: '2-digit' });
-const day = (at: string) => dayFormatter.format(new Date(at));
-const formatTime = (at: string) => timeFormatter.format(new Date(at));
+// Read the zone at call time: it is the clinic's, set when the record loads.
+const day = (at: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: clinicTimeZone(), day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(at));
+const formatTime = (at: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: clinicTimeZone(), hour: '2-digit', minute: '2-digit' }).format(new Date(at));
 
 export function MessageHistory({ state, conversation, patientName, messages, pendingId, busy, owned, onRetry }: {
   state: DemoState; conversation: Conversation; patientName: string; messages: Message[];

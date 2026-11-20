@@ -169,7 +169,7 @@ test('(f) detalhes: ações por situação, menu ⋯, cancelamento com motivo e 
   await expect(details.getByRole('link', { name: /Ana Beatriz Santos/ })).toHaveAttribute('href', '/gestao/pacientes?id=patient-1');
   await expect(details.locator('.details-meta')).toContainText('Viva Saúde');
   await expect(details.locator('.details-meta')).toContainText('Marina Costa');
-  await expect(details).toContainText('As anotações ficam disponíveis depois que a consulta for realizada.');
+  await expect(details).not.toContainText('Anotaç');
   await expect(details.getByRole('button', { name: 'Confirmar', exact: true })).toBeVisible();
   await expect(details.getByRole('button', { name: 'Remarcar', exact: true })).toBeVisible();
   await details.getByRole('button', { name: 'Mais ações', exact: true }).click();
@@ -200,30 +200,12 @@ test('(f) detalhes: ações por situação, menu ⋯, cancelamento com motivo e 
   await expect(form.getByLabel('Profissional', { exact: true })).toHaveValue(realizada.professionalId);
 });
 
-test('(g) anotação: salvar, Ctrl+Enter, editar cria versão e <details> mostra a anterior', async ({ page }) => {
+test('(g) consulta realizada: sem campo de anotação clínica e histórico preservado', async ({ page }) => {
   const details = await openDetails(page, realizada.id);
-  await expect(details.getByRole('heading', { name: 'Anotações' })).toBeVisible();
-  await expect(details).not.toContainText('Anotações da consulta');
-  const composer = details.getByLabel('Nova anotação', { exact: true });
-  await expect(composer).toHaveAttribute('placeholder', 'Adicionar uma anotação…');
-  await expect(details.getByRole('button', { name: 'Salvar anotação', exact: true })).toBeDisabled();
-  await composer.fill('Primeira versão da anotação fictícia.');
-  await composer.press('Control+Enter');
-  await expect(details.getByRole('status')).toContainText('Anotações salvas');
-  await expect(details.locator('.note-body')).toHaveText('Primeira versão da anotação fictícia.');
-  await details.getByRole('button', { name: 'Editar', exact: true }).click();
-  await expect(composer).toHaveValue('Primeira versão da anotação fictícia.');
-  await composer.fill('Segunda versão revisada.');
-  await details.getByRole('button', { name: 'Salvar anotação', exact: true }).click();
-  await expect(details.locator('.note-body')).toHaveText('Segunda versão revisada.');
-  const versions = details.locator('details.note-versions');
-  await expect(versions.locator('summary')).toHaveText('Versão 2 · ver 1 versão anterior');
-  await expect(versions.getByText('Primeira versão da anotação fictícia.')).toBeHidden();
-  await versions.locator('summary').click();
-  await expect(versions.getByText('Primeira versão da anotação fictícia.')).toBeVisible();
-  const notes = (await snapshot(page)).appointments.find(a => a.id === realizada.id)!.notes!;
-  expect(notes.map(n => n.text)).toEqual(['Primeira versão da anotação fictícia.', 'Segunda versão revisada.']);
-  await expect(details.locator('.details-history li').first()).toContainText('salvou uma anotação');
+  await expect(details.getByRole('heading', { name: 'Histórico' })).toBeVisible();
+  await expect(details.getByRole('textbox')).toHaveCount(0);
+  await expect(details).not.toContainText('Anotaç');
+  await expect(details.getByRole('link', { name: /Agendar retorno/ })).toBeVisible();
 });
 
 test('(h) 390 px: formulário em uma coluna e detalhes sem transbordamento', async ({ page }) => {

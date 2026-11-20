@@ -1,10 +1,11 @@
 import { dateTime, minutes } from './date';
+import { normalizeText } from './format';
 import { getMetrics } from './metrics';
 import type { DemoState, Period } from './types';
 
 export const teamSorts = ['name', 'planned', 'completed', 'occupancy', 'weeklyMinutes'] as const;
 export type TeamSort = typeof teamSorts[number];
-const normalize = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+const normalize = (text: string) => normalizeText(text).trim();
 
 /** Roster filters describe current registration; operational rates retain the
  * existing period/capacity calculations, including historical snapshots. */

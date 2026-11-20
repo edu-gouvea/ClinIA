@@ -4,6 +4,7 @@ import { useDemo } from '@/components/demo-provider';
 import { Button, Modal } from '@/components/ui';
 import { TimeInput } from '@/components/date-time-fields';
 import { minutes } from '@/lib/date';
+import { plural } from '@/lib/format';
 import { formatDayTitle } from '@/lib/agenda-presentation';
 import { shortDay } from '@/lib/conversation-assistant';
 import { appointmentSummaryLine, availableDaysInMonth, availableSlots, durationOptions, firstAvailableDay, startTimeIssue } from '@/lib/booking';
@@ -14,7 +15,6 @@ import { MiniCalendar } from './agenda-toolbar';
 type Props = { onClose: () => void; appointment?: Appointment; patientId?: string; professionalId?: string; initialDate?: string; initialStart?: string; reservedBlock?: Omit<Block, 'id'>; onSaved?: () => void };
 const QUICK = [15, 30, 45, 60];
 const STALE = 'O horário escolhido não está mais livre.';
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** "Novo agendamento" / "Remarcar consulta": summary · month · free times. Days and
  * times come from `availableDaysInMonth`/`availableSlots` (the existing free-slot rule

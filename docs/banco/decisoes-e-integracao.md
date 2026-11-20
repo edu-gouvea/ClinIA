@@ -11,14 +11,14 @@
 - Auditoria admite acréscimo e rejeita UPDATE/DELETE por trigger. O papel da API não deve receber TRUNCATE. Administradores continuam tendo capacidade de alterar a infraestrutura; não é trilha inviolável contra superusuário.
 - Mensagens têm chave de idempotência por clínica e ID externo único quando presente. Tentativa de envio deve reutilizar a mesma chave e atualizar status, sem inserir outra mensagem.
 - Uma sessão aberta por conversa. Sessões e mensagens preservam os atendimentos anteriores.
-- Não há prontuário, diagnóstico, exames ou anotações clínicas. `administrative_notes` é exclusivamente administrativo. O frontend contém anotações de consulta que precisam ser revistas pelo grupo antes da persistência real.
+- Não há prontuário, diagnóstico, exames ou anotações clínicas. `administrative_notes` é exclusivamente administrativo. O frontend retirou as anotações de consulta (ver `docs/DECISOES.md`), alinhado a esta decisão.
 
 ## Mapeamento do frontend
 
 | Frontend | Persistência / adaptação |
 |---|---|
 | `Clinic` | `clinics`, `clinic_hours`, `insurances`, `specialties` |
-| `DemoUser` | `users`; identidade vem da autenticação real |
+| `DemoUser` | `users`; `access` ('admin'/'attendant') = `users.role`; identidade vem da autenticação real |
 | `Patient` | `patients`; `notes` vira `administrative_notes` |
 | `Professional.specialties` | join em `professional_specialties` e `specialties` |
 | `Professional.availability` | `professional_availability` |
@@ -30,7 +30,7 @@
 | `Knowledge` | `knowledge_documents` |
 | `AdminEvent` | `audit_events`, com entidade/tipo e detalhes mínimos |
 | histórico do assistente global | continua local até necessidade definida; não é agente de paciente |
-| `ConsultationNote` | sem tabela nesta proposta; excede escopo administrativo inicial |
+| `ConsultationNote` | removido do frontend; sem tabela (fora do escopo administrativo) |
 
 ## Transações que o backend deve implementar
 
